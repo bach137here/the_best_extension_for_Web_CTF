@@ -2,7 +2,7 @@
 import { createServer } from 'node:http';
 import { readFile, writeFile } from 'node:fs/promises';
 const root = new URL('../', import.meta.url);
-const files = new Set(['popup.css', 'popup.js', 'policy.js', 'i18n.js', 'scope.js', 'network.js', 'dom-guard.js', 'page.js', 'content.js', 'hints.js']);
+const files = new Set(['popup.css', 'popup.js', 'policy.js', 'i18n.js', 'scope.js', 'network.js', 'dom-guard.js', 'page.js', 'content.js', 'hints.js', 'replay.js', 'request.js', 'response.js', 'response.css']);
 function mockChrome(language, pageDemo = false) {
   return `(() => {
     const defaults = { language: ${JSON.stringify(language)}, disabledSites: [], disabledEndpoints: [], prefs: { passwords: true, reveal: true, unlock: true, textInputs: true, copy: true, urlBar: ${pageDemo} } };
@@ -19,13 +19,18 @@ function mockChrome(language, pageDemo = false) {
       { method: 'GET', path: '/assets/app.js', status: 304, type: 'script', contentType: 'application/javascript', count: 1, duration: 5, fromCache: true }
     ].map((entry, index) => ({ ...entry, tabId: 7, url: 'https://demo.ctf' + entry.path, headersKnown: true, headers: [{ name: 'Accept', value: 'application/json' }], time: index }));
     window.chrome = {
-      storage: { local: {
+      storage: { session: {
+        get: async key => ({ [key]: JSON.parse(localStorage.getItem('ctf-demo-session') || '{}')[key] }),
+        set: async values => localStorage.setItem('ctf-demo-session', JSON.stringify({ ...JSON.parse(localStorage.getItem('ctf-demo-session') || '{}'), ...values })),
+        remove: async key => { const data = JSON.parse(localStorage.getItem('ctf-demo-session') || '{}'); delete data[key]; localStorage.setItem('ctf-demo-session', JSON.stringify(data)); }
+      }, local: {
         get: async keys => { const data = read(); return Object.fromEntries((Array.isArray(keys) ? keys : [keys]).map(key => [key, data[key]])); },
         set: async values => { const old = read(), next = { ...old, ...values }; localStorage.setItem('ctf-demo-settings', JSON.stringify(next)); emit(old, next); },
         remove: async key => { const old = read(), next = { ...old }; delete next[key]; localStorage.setItem('ctf-demo-settings', JSON.stringify(next)); emit(old, next); }
       }, onChanged: { addListener: fn => listeners.push(fn) } },
-      tabs: { query: async () => [{ id: 7, url: 'https://demo.ctf/challenge' }], reload: async () => {} },
-      runtime: { sendMessage: async message => {
+      tabs: { query: async () => [{ id: 7, url: 'https://demo.ctf/challenge' }], reload: async () => {}, create: async options => { window.open(options.url, '_blank'); return { id: 100 }; } },
+      runtime: { getURL: path => location.origin + '/' + path, sendMessage: async message => {
+        if (message.type === 'takeReplay') { const jobs = JSON.parse(localStorage.getItem('ctf-demo-session') || '{}'), job = jobs[message.key]; delete jobs[message.key]; localStorage.setItem('ctf-demo-session',JSON.stringify(jobs)); return { job }; }
         if (message.type === 'address') return { raw: message.url };
         if (message.type === 'scopeContext') return { url: location.href };
         if (message.type === 'navigate') { location.assign(message.url); return { ok: true }; }
@@ -44,6 +49,16 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname === '/__stop') { res.end('stopped'); server.close(); return; }
+    if (url.pathname === '/__echo') {
+      const chunks = []; for await (const chunk of req) chunks.push(chunk);
+      res.statusCode = url.searchParams.get('status') === '403' ? 403 : 200;
+      res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ method:req.method, url:req.url, check:req.headers['x-check'], body:Buffer.concat(chunks).toString('utf8') })); return;
+    }
+    if (url.pathname === '/__html') { res.setHeader('Content-Type','text/html'); res.end('<script>window.__ctfExecuted=1</script><h1>HTML demo response</h1>'); return; }
+    if (url.pathname === '/response.html') {
+      let html = await readFile(new URL('response.html',root),'utf8'); html = html.replace('</head>',`<script>${mockChrome('en')}</script></head>`);
+      res.setHeader('Content-Type','text/html; charset=utf-8'); res.end(html); return;
+    }
     if (url.pathname === '/zen-demo') {
       let html = await readFile(new URL('../docs/demo.html', root), 'utf8');
       html = html.replace('</head>', `<script>${mockChrome('en', true)}</script></head>`);

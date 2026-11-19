@@ -1,4 +1,4 @@
-# CTF Simple 3.2.1
+# CTF Simple 3.3.0
 
 [Read the full guide and demos](../README.md).
 

@@ -15,7 +15,7 @@ function boot() {
     tabs: { onRemoved: event(), onUpdated: event(), get: async id => ({ id, url: tabURLs.get(id) || 'https://ctf.test/challenge' }), update: async (id, args) => { navigation = { id, ...args }; } },
     contentSettings: { javascript: { clear: async () => {} } },
     storage: { local: { get: async keys => Object.fromEntries((Array.isArray(keys) ? keys : [keys]).map(key => [key, localSettings[key]])) }, onChanged: event(), session: {
-      get: async key => ({ [key]: JSON.parse(JSON.stringify(memory[key] || [])) }),
+      get: async key => memory[key] === undefined ? {} : ({ [key]: JSON.parse(JSON.stringify(memory[key])) }),
       remove: async key => { delete memory[key]; },
       set: async values => Object.assign(memory, JSON.parse(JSON.stringify(values)))
     } },
@@ -129,3 +129,12 @@ chrome.webRequest.onBeforeSendHeaders.listener({ tabId: 67, requestId: 'settings
 await message({ type: 'requests', tabId: 67 });
 assert.ok(!memory.requests.some(entry => entry.rid === 'settings-race'), 'Requests issued while paused stay excluded even when enabled before queue drains');
 console.log('PASS: exclusion settings snapshot survives immediate re-enable and later header events.');
+memory['replay:once']={raw:'POST /login HTTP/1.1\r\nHost: ctf.test\r\n\r\nbody',protocol:'https:'};
+const replaySender={url:'chrome-extension://ctf/response.html#replay:once'};
+const claims=await Promise.all([message({type:'takeReplay',key:'replay:once'},replaySender),message({type:'takeReplay',key:'replay:once'},replaySender)]);
+assert.equal(claims.filter(result=>result.job).length,1,'Concurrent response tabs can only claim a POST once');
+assert.equal(memory['replay:once'],undefined);
+let unauthorized=false;
+chrome.runtime.onMessage.listener({type:'takeReplay',key:'replay:once'},{url:'https://ctf.test',tab:{id:7}},()=>{unauthorized=true;});
+assert.equal(unauthorized,false,'Web content cannot retrieve replay credentials');
+console.log('PASS: atomic replay claims and response-page-only access.');

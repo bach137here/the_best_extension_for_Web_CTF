@@ -2,11 +2,11 @@
 
 <h1 align="center">CTF Simple</h1>
 <p align="center"><strong>Less wallpaper. More flags.</strong><br>A small Chrome / Edge extension for getting straight to the useful parts of a web challenge.</p>
-<p align="center">Vanilla JavaScript · No build step · VI / EN interface · MIT · v3.2.1</p>
+<p align="center">Vanilla JavaScript · No build step · VI / EN interface · MIT · v3.3.0</p>
 
 Remove the CSS. Spot a suspicious `.view-source`. Unmask an input. Copy a request. Keep solving.
 
-![CTF Simple popup with CSS hints, request filters, and an expanded request path](docs/screenshots/popup-en.png)
+![CTF Simple popup with CSS hints, compact request groups, and copy controls](docs/screenshots/popup-en.png)
 
 ## Get started
 
@@ -57,6 +57,8 @@ Click **Reload & capture** to record a fresh page load. CSS, scripts, images, fo
 
 Combine **method**, **resource type**, **MIME type**, **status** (`403`, `4xx`, `error`), and **path search** filters. Only requests to the current exact hostname appear.
 
+**Group endpoints** is on by default: requests with the same method, origin, and path share one row, even when the query or body differs. For example, two `POST /login` requests with different credentials become one row. The count adds up their occurrences; expand the row to choose a variant and inspect its query/body before copying. Newest is selected initially. Your chosen variant survives log updates. Turn grouping off to see separate rows again; the original records are never merged or discarded.
+
 Copy an observed request as:
 
 | Button | Paste it into |
@@ -66,6 +68,28 @@ Copy an observed request as:
 | **Raw** | A text editor or HTTP request editor; reconstructed HTTP/1.1 |
 
 Exports keep the full URL. Repeated requests with the same tab, method, URL, and body become one row with a count.
+
+**Headers: Minimal** is the default for all three copy buttons. It removes browser metadata such as `Sec-Fetch-*`, `Sec-CH-UA*`, `User-Agent`, language/cache/compression preferences, and connection noise. It keeps authentication, cookies, Content-Type/Content-Encoding, Accept, Origin/Referer, and unknown application headers such as CSRF tokens. Choose **Headers: Full** to include the other captured headers when a server depends on them. Both modes normalize transport headers: curl calculates them; Raw reconstructs Host and Content-Length. These are request exports, not captured response bodies. Both preferences are remembered across popup openings.
+
+### 4. Paste Raw. Edit. Send.
+
+Click the small **Raw ↗** button in the request toolbar. A blank editor opens **inside the extension popup**. Paste your Raw request, edit it, choose HTTP or HTTPS, and press **Send**. The response opens in a **new browser tab**, with status, headers, and body.
+
+```http
+POST /login HTTP/1.1
+Host: example.test
+Content-Type: application/json
+
+{"username":"guest","password":"demo"}
+```
+
+Raw Fetch uses the browser's `fetch` API and cookie jar. You cannot manually reproduce browser-controlled headers such as Cookie, Host, Origin, or Sec-*; omitted names are listed in the response tab. GET/HEAD bodies and unsupported methods are rejected. Use cURL when you need closer control of the wire request. Responses are shown as text, including HTML, with a 30-second timeout and a 2 MiB preview limit. Refreshing a response tab does not resend the request.
+
+The editor sends UTF-8 text and normalizes pasted line endings to LF. Transfer-encoded/chunked Raw bodies are rejected rather than sent with incorrect framing. It is not a byte-exact raw socket client. [Chrome host permissions](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests) enable cross-origin Fetch; [browser-controlled headers](https://developer.mozilla.org/en-US/docs/Glossary/Forbidden_request_header) remain restricted.
+
+| Edit inside the popup | Read the response in a new tab |
+| --- | --- |
+| ![Raw editor inside the extension popup](docs/screenshots/raw-editor.png) | ![Fetch response with status, headers, and text body](docs/screenshots/fetch-response.png) |
 
 ## Small helpers, already switched on
 
@@ -129,6 +153,7 @@ node css-blocker/tests/dom-guard.mjs
 node css-blocker/tests/i18n.mjs
 node css-blocker/tests/policy.mjs
 node css-blocker/tests/scope.mjs
+node css-blocker/tests/replay.mjs
 ```
 
 On Windows, `node css-blocker/tests/curl-cmd.mjs` checks CMD exports against a local server. Browser fixtures use `tests/demo-server.mjs` and Ego Browser. These use simulated Chrome APIs; load the unpacked extension in Chrome/Edge for integration checks.

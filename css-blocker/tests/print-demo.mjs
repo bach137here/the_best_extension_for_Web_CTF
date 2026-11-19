@@ -12,7 +12,10 @@ await page.evaluate(async () => {
   CTFI18N.setLanguage('en'); CTFI18N.apply(document); document.querySelector('#language').checked = true;
   renderScope(); renderHints(); renderRequests(); status(lastStatus);
   requests[0].url = 'https://demo.ctf/api/very/long/path/with/details?search=demo%20data&filter=include-all-records-and-fields&next=%2Fadmin%2Fdashboard';
-  renderRequests();
+  requests[0].time = 1000;
+  const demo = requests.map(entry => ({ ...entry })), original = chrome.runtime.sendMessage;
+  chrome.runtime.sendMessage = async message => message.type === 'requests' ? { entries: demo } : original(message);
+  await loadRequests(true);
 });
 await page.click('.request:first-child .expand-url');
 assert.ok(await page.evaluate(() => { const detail = document.querySelector('.url-detail'); return !detail.hidden && detail.textContent.endsWith('%2Fdashboard') && detail.scrollWidth <= detail.clientWidth; }));

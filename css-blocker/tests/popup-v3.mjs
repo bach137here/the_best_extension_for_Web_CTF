@@ -41,6 +41,8 @@ vm.runInContext(await readFile(new URL('../policy.js', import.meta.url), 'utf8')
 vm.runInContext(await readFile(new URL('../popup.js', import.meta.url), 'utf8'), context);
 await new Promise(resolve => setImmediate(resolve));
 assert.equal(find('block').disabled, false);
+assert.equal(find('exportHeaders').value, 'minimal');
+assert.equal(find('groupEndpoints').checked, true);
 assert.deepEqual(find('hints').children.map(entry => entry.textContent), ['.view-source'], 'Default hint view hides utility noise');
 await find('block').click(); assert.equal(css, true); assert.equal(stored['strong:ctf.test'], true);
 await find('restore').click(); assert.equal(stored['strong:ctf.test'], undefined); assert.equal(reloads, 1);
@@ -78,4 +80,21 @@ requests.push({ method: 'GET', url: 'https://ctf.test/app.js', type: 'script', c
 await find('refresh').click();
 assert.equal(find('requestCount').textContent, 1, 'Exclude static resources from old logs and request counts');
 await find('clear').click(); assert.equal(find('requestCount').textContent, 0);
+requests = [
+  { method:'POST',url:'https://ctf.test/login?q=first',type:'xmlhttprequest',count:2,time:1,body:{text:'first-body'},headers:[{name:'User-Agent',value:'browser'}] },
+  { method:'POST',url:'https://ctf.test/login?q=second',type:'xmlhttprequest',count:1,time:2,body:{text:'second-body'},headers:[{name:'User-Agent',value:'browser'}] }
+];
+find('requestContent').value = 'all'; await find('refresh').click();
+assert.equal(find('requestCount').textContent,1,'Group different bodies and queries into one endpoint');
+let groupedRow = find('requests').children[0];
+await groupedRow.children[0].children[3].children[0].click();
+assert.ok(copied.includes('second-body')); assert.ok(!copied.includes('User-Agent'));
+find('exportHeaders').value='full'; await find('exportHeaders').change(); assert.equal(stored.exportHeaders,'full');
+await groupedRow.children[0].children[3].children[0].click(); assert.ok(copied.includes('User-Agent'));
+const chooser=groupedRow.children[1].children[0]; chooser.value='1'; chooser.change();
+await groupedRow.children[0].children[3].children[2].click(); assert.ok(copied.endsWith('first-body')); assert.ok(copied.includes('q=first'));
+await find('refresh').click(); groupedRow=find('requests').children[0];
+await groupedRow.children[0].children[3].children[2].click(); assert.ok(copied.endsWith('first-body'),'Retain variant selection after refresh');
+find('groupEndpoints').checked=false; await find('groupEndpoints').change();
+assert.equal(find('requestCount').textContent,2); assert.equal(stored.groupEndpoints,false);
 console.log('PASS: minimal popup, CSS buttons, default helpers/checkbox save, URL/Zen toggles, CSS filters, curl/raw buttons and clear.');

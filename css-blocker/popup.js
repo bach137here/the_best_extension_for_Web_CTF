@@ -6,6 +6,7 @@ let rules = {}, enabled = false, lastStatus = 'Đang mở…';
 let saving = Promise.resolve();
 let refreshPageState = false;
 const expandedRequests = new Set();
+const selectedVariants = new Map();
 const t = (key, params) => globalThis.CTFI18N?.t(key, params) ?? key;
 const status = (message, params) => { lastStatus = message; $('#status').textContent = t(message, params); };
 function renderScope() {
@@ -68,20 +69,47 @@ function renderRequests() {
     if (type === 'background') return entry.tabId === -1;
     return type === 'error' && (typeof entry.status === 'string' || Number(entry.status) >= 400);
   });
-  $('#requestCount').textContent = requests.length;
-  $('#requestCount').title = t('{count} đang hiện · {total} lượt đã ghi trong các nhóm này', { count: entries.length, total: requests.reduce((sum, entry) => sum + entry.count, 0) });
+  const grouping = $('#groupEndpoints').checked;
+  const displayed = grouping ? CTFNetwork.groupEndpoints(entries) : entries;
+  $('#requestCount').textContent = grouping ? CTFNetwork.groupEndpoints(requests).length : requests.length;
+  $('#requestCount').title = t('{count} đang hiện · {total} lượt đã ghi trong các nhóm này', { count: displayed.length, total: requests.reduce((sum, entry) => sum + entry.count, 0) });
   $('#requests').replaceChildren();
-  for (const entry of entries) {
+  for (const entry of displayed) {
+    let selected = entry.variants?.[0] || entry, refreshSelection = () => {};
     const row = document.createElement('div'); row.className = 'request';
     const main = document.createElement('div'); main.className = 'request-main';
     const method = document.createElement('span'); method.className = 'method'; method.textContent = entry.method; main.append(method);
     const url = document.createElement('div'); url.className = 'url'; url.title = entry.url;
-    try { const parsed = new URL(entry.url); url.textContent = parsed.pathname + parsed.search; }
-    catch { url.textContent = entry.url; }
+    let fullPath = entry.url;
+    try { const parsed = new URL(entry.url); fullPath = parsed.pathname + parsed.search; url.textContent = entry.variants ? parsed.pathname : fullPath; }
+    catch { url.textContent = fullPath; }
     const urlCell = document.createElement('div'); urlCell.className = 'url-cell';
     const expand = document.createElement('button'); expand.className = 'expand-url';
-    const detail = document.createElement('div'); detail.className = 'url-detail'; detail.textContent = url.textContent;
-    const key = `${entry.method} ${entry.url}`;
+    const detail = document.createElement('div'); detail.className = 'url-detail'; detail.textContent = fullPath;
+    const key = `${entry.method} ${entry.variants ? new URL(entry.url).origin + new URL(entry.url).pathname : entry.url}`;
+    if (entry.variants?.length > 1) {
+      detail.textContent = '';
+      const chooser = document.createElement('select'); chooser.setAttribute('aria-label', t('Biến thể request'));
+      entry.variants.forEach((variant, index) => {
+        const option = document.createElement('option'); option.value = String(index);
+        const parsed = new URL(variant.url);
+        const preview = (variant.body?.text ?? variant.body?.base64 ?? '').replace(/\s+/g, ' ').slice(0, 90);
+        option.textContent = `${index + 1}/${entry.variants.length} · ${parsed.pathname}${parsed.search}` + (preview ? ` · ${preview}` : '');
+        chooser.append(option);
+      });
+      const address = document.createElement('div'), payload = document.createElement('pre'); payload.className = 'variant-body';
+      const choose = () => {
+        selected = entry.variants[Number(chooser.value) || 0];
+        const parsed = new URL(selected.url); address.textContent = parsed.pathname + parsed.search; url.title = selected.url;
+        payload.textContent = selected.body?.text ?? (selected.body?.base64 !== undefined ? 'base64: ' + selected.body.base64 : '');
+        payload.hidden = !payload.textContent;
+        refreshSelection();
+      };
+      const remembered = entry.variants.findIndex(variant => CTFNetwork.identity(variant) === selectedVariants.get(key));
+      chooser.value = String(remembered >= 0 ? remembered : 0);
+      chooser.addEventListener('change', () => { choose(); selectedVariants.set(key, CTFNetwork.identity(selected)); });
+      detail.append(chooser, address, payload); choose();
+    }
     const updateExpanded = () => {
       const open = expandedRequests.has(key);
       detail.hidden = !open; expand.textContent = open ? '▴' : '▾';
@@ -94,22 +122,30 @@ function renderRequests() {
     });
     updateExpanded(); urlCell.append(url, expand); main.append(urlCell);
     const code = document.createElement('span');
-    const numeric = Number(entry.status);
-    code.className = 'status-code' + (typeof entry.status === 'string' || numeric >= 400 ? ' error' : numeric >= 300 ? ' redirect' : numeric >= 200 ? ' success' : '');
-    code.textContent = typeof entry.status === 'string' ? 'ERR' : entry.status || '…'; code.title = String(entry.status || t('Đang tải')); main.append(code);
+    main.append(code);
     const buttons = document.createElement('div'); buttons.className = 'buttons';
+    const buttonUpdates = [];
     for (const format of ['curl', 'curlCmd', 'raw']) {
       const button = document.createElement('button'); button.dataset.format = format;
-      button.textContent = ({ curl: 'cURL', curlCmd: 'cURL CMD', raw: 'Raw' })[format] + (entry.body?.approximate ? ' ≈' : '');
-      button.title = t(({ curl: 'Copy cURL cho Bash', curlCmd: 'Copy cURL cho Windows CMD (dán trực tiếp)', raw: 'Copy HTTP/1.1 tái dựng' })[format]) + (entry.body?.approximate ? t(' · Body form tái dựng, có thể khác encoding/thứ tự gốc') : '');
-      if (/^wss?:/.test(entry.url)) { button.disabled = true; button.title = t('Đã ghi WebSocket handshake; đây không phải request HTTP để phát lại bằng cURL/raw.'); }
-      button.addEventListener('click', () => { try { copy(CTFNetwork[format](entry)); } catch (error) { status(error.message); } }); buttons.append(button);
+      buttonUpdates.push(() => {
+        button.textContent = ({ curl: 'cURL', curlCmd: 'cURL CMD', raw: 'Raw' })[format] + (selected.body?.approximate ? ' ≈' : '');
+        button.title = t(({ curl: 'Copy cURL cho Bash', curlCmd: 'Copy cURL cho Windows CMD (dán trực tiếp)', raw: 'Copy HTTP/1.1 tái dựng' })[format]) + (selected.body?.approximate ? t(' · Body form tái dựng, có thể khác encoding/thứ tự gốc') : '') + (entry.variants?.length > 1 ? ' · ' + t('Copy biến thể đang chọn; mặc định mới nhất.') : '');
+        button.disabled = /^wss?:/.test(selected.url);
+        if (button.disabled) button.title = t('Đã ghi WebSocket handshake; đây không phải request HTTP để phát lại bằng cURL/raw.');
+      });
+      button.addEventListener('click', () => { try { copy(CTFNetwork[format](selected, $('#exportHeaders').value)); } catch (error) { status(error.message); } }); buttons.append(button);
     }
     main.append(buttons); row.append(main, detail);
     const meta = document.createElement('p'); meta.className = 'meta';
-    const kind = ({ xmlhttprequest: 'FETCH/XHR', main_frame: 'DOCUMENT', sub_frame: 'IFRAME', stylesheet: 'CSS', websocket: 'WS' })[entry.type] || (entry.type || 'request').toUpperCase();
-    meta.textContent = [kind, entry.contentType || '', `${entry.count}×`, Number.isFinite(entry.duration) ? `${Math.round(entry.duration)} ms` : '', entry.fromCache ? 'cache' : '', entry.frameId > 0 ? `frame ${entry.frameId}` : '', entry.tabId === -1 ? t('SW/nền') : '', entry.headersKnown === false ? t('thiếu headers') : '', entry.body?.approximate ? 'body ≈' : '', entry.body?.truncated || entry.body?.missing ? t('thiếu body') : ''].filter(Boolean).join(' · ');
-    meta.title = meta.textContent; row.append(meta); $('#requests').append(row);
+    refreshSelection = () => {
+      buttonUpdates.forEach(update => update());
+      const kind = ({ xmlhttprequest: 'FETCH/XHR', main_frame: 'DOCUMENT', sub_frame: 'IFRAME', stylesheet: 'CSS', websocket: 'WS' })[selected.type] || (selected.type || 'request').toUpperCase();
+      meta.textContent = [kind, selected.contentType || '', `${entry.count}×`, entry.variants?.length > 1 ? t('{count} biến thể · bung để chọn', { count: entry.variants.length }) : '', Number.isFinite(selected.duration) ? `${Math.round(selected.duration)} ms` : '', selected.fromCache ? 'cache' : '', selected.frameId > 0 ? `frame ${selected.frameId}` : '', selected.tabId === -1 ? t('SW/nền') : '', selected.headersKnown === false ? t('thiếu headers') : '', selected.body?.approximate ? 'body ≈' : '', selected.body?.truncated || selected.body?.missing ? t('thiếu body') : ''].filter(Boolean).join(' · ');
+      meta.title = meta.textContent;
+      code.textContent = typeof selected.status === 'string' ? 'ERR' : selected.status || '…'; code.title = String(selected.status || t('Đang tải'));
+      const numeric = Number(selected.status); code.className = 'status-code' + (typeof selected.status === 'string' || numeric >= 400 ? ' error' : numeric >= 300 ? ' redirect' : numeric >= 200 ? ' success' : '');
+    };
+    refreshSelection(); row.append(meta); $('#requests').append(row);
   }
   if (!entries.length) { const p = document.createElement('p'); p.className = 'empty'; p.textContent = t(requests.length ? 'Không có request khớp bộ lọc.' : 'Chưa có request. Bấm Reload & ghi để bắt lần tải trang.'); $('#requests').append(p); }
 }
@@ -135,6 +171,19 @@ async function refreshLive() {
   await loadRequests();
 }
 const act = (task, allowPaused = false) => async () => { try { if (!enabled && !allowPaused) return status('Đã tắt công cụ trên trang này. Các thiết lập được giữ lại.'); await task(); } catch (error) { status(error.message); } };
+$('#rawFetch').addEventListener('click', act(async () => {
+  const editor = $('#rawEditor');
+  if (!editor.dataset.initialized) { $('#protocol').value = new URL(tab.url).protocol; editor.dataset.initialized = '1'; }
+  editor.showModal(); $('#rawRequest').focus();
+}));
+$('#exportHeaders').addEventListener('change', act(async () => {
+  await chrome.storage.local.set({ exportHeaders: $('#exportHeaders').value === 'full' ? 'full' : 'minimal' });
+  status('Đã lưu lựa chọn.');
+}));
+$('#groupEndpoints').addEventListener('change', act(async () => {
+  await chrome.storage.local.set({ groupEndpoints: $('#groupEndpoints').checked });
+  renderRequests(); status('Đã lưu lựa chọn.');
+}));
 $('#language').addEventListener('change', act(async () => {
   const language = $('#language').checked ? 'en' : 'vi';
   CTFI18N.setLanguage(language); await chrome.storage.local.set({ language }); CTFI18N.apply(document);
@@ -176,7 +225,9 @@ $('#clear').addEventListener('click', act(async () => { const response = await c
   try {
     [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const url = new URL(tab.url); if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Mở một trang web HTTP/HTTPS để dùng.');
-    const saved = await chrome.storage.local.get(['disabledSites', 'disabledEndpoints', 'language', 'prefs', `zen:${url.hostname}`]);
+    const saved = await chrome.storage.local.get(['disabledSites', 'disabledEndpoints', 'language', 'prefs', 'exportHeaders', 'groupEndpoints', `zen:${url.hostname}`]);
+    $('#exportHeaders').value = saved.exportHeaders === 'full' ? 'full' : 'minimal';
+    $('#groupEndpoints').checked = saved.groupEndpoints !== false;
     rules = saved; enabled = !CTFPolicy.isDisabled(tab.url, rules);
     setInterval(() => refreshLive().catch(() => {}), 1500);
     globalThis.CTFI18N?.setLanguage(saved.language || 'vi'); $('#language').checked = saved.language === 'en'; globalThis.CTFI18N?.apply(document);

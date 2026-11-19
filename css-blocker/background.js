@@ -119,6 +119,15 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.contentSettings.javascript.clear({ scope: 'regular' }).catch(() => {});
 });
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === 'takeReplay') {
+    if (sender.url?.split('#')[0] !== chrome.runtime.getURL('response.html') || !/^replay:[a-zA-Z0-9-]+$/.test(message.key || '')) return;
+    serialized(async () => {
+      const stored = await chrome.storage.session.get(message.key), job = stored[message.key];
+      await chrome.storage.session.remove(message.key);
+      return job;
+    }).then(job => sendResponse({ job }), error => sendResponse({ error: error.message }));
+    return true;
+  }
   if (message?.type === 'scopeContext' && sender.tab?.id >= 0) {
     Promise.resolve(sender.tab.url ? sender.tab : chrome.tabs.get(sender.tab.id)).then(tab => sendResponse({ url: tab.url }), () => sendResponse({ url: '' }));
     return true;

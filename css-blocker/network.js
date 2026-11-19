@@ -29,7 +29,18 @@ globalThis.CTFNetwork = (() => {
     }
     return { missing: true };
   }
-  const identity = entry => JSON.stringify([entry.tabId, entry.method, entry.url, entry.body?.text ?? entry.body?.base64 ?? '', !!entry.body?.missing, !!entry.body?.truncated]);
+  const identity = entry => JSON.stringify([entry.tabId, entry.method, entry.url, entry.body?.text !== undefined ? ['text', entry.body.text] : entry.body?.base64 !== undefined ? ['base64', entry.body.base64] : [entry.body ? 'unavailable' : 'none'], !!entry.body?.missing, !!entry.body?.truncated, !!entry.body?.approximate]);
+  function groupEndpoints(entries) {
+    const groups = new Map();
+    for (const entry of [...entries].sort((a, b) => (b.time || 0) - (a.time || 0))) {
+      const url = new URL(entry.url);
+      const key = JSON.stringify([entry.method, url.origin, url.pathname]);
+      const group = groups.get(key);
+      if (group) { group.variants.push(entry); group.count += entry.count || 1; }
+      else groups.set(key, { ...entry, count: entry.count || 1, variants: [entry] });
+    }
+    return [...groups.values()];
+  }
   function upsert(entries, request) {
     const key = identity(request);
     const index = entries.findIndex(entry => identity(entry) === key);
@@ -47,14 +58,20 @@ globalThis.CTFNetwork = (() => {
     if (request.body?.approximate && !request.headers?.some(header => header.name.toLowerCase() === 'content-type' && header.value?.toLowerCase().startsWith('application/x-www-form-urlencoded'))) throw fail('Body multipart/form thiếu bytes gốc; không thể xuất chính xác.');
     return url;
   }
-  function headers(request) {
-    return (request.headers || []).filter(header => !header.name.startsWith(':') && !['host', 'content-length', 'transfer-encoding'].includes(header.name.toLowerCase()));
+  const optionalHeaders = new Set(['accept-encoding', 'accept-language', 'user-agent', 'cache-control', 'pragma', 'priority', 'dnt', 'upgrade-insecure-requests', 'connection', 'keep-alive', 'proxy-connection', 'te', 'trailer']);
+  function headers(request, mode) {
+    return (request.headers || []).filter(header => {
+      const name = header.name.toLowerCase();
+      if (name.startsWith(':') || ['host', 'content-length', 'transfer-encoding'].includes(name)) return false;
+      return mode === 'full' || (!optionalHeaders.has(name) && !/^sec-(?:fetch-|ch-ua(?:-|$))/.test(name));
+    });
   }
-  function curl(request) {
+  function curl(request, mode = 'minimal') {
     validate(request);
     const args = ['curl --globoff --path-as-is', '--request ' + quote(request.method), '--url ' + quote(request.url)];
-    for (const header of headers(request)) args.push('--header ' + quote(`${header.name}: ${header.value || ''}`));
-    if (request.headers?.some(header => header.name.toLowerCase() === 'accept-encoding')) args.push('--compressed');
+    const selected = headers(request, mode);
+    for (const header of selected) args.push('--header ' + quote(`${header.name}: ${header.value || ''}`));
+    if (selected.some(header => header.name.toLowerCase() === 'accept-encoding')) args.push('--compressed');
     let prefix = '';
     if (request.body?.base64 !== undefined) {
       prefix = `printf '%s' ${quote(request.body.base64)} | base64 --decode | `;
@@ -63,16 +80,16 @@ globalThis.CTFNetwork = (() => {
     const note = (request.headersKnown === false ? '# Chrome khong cung cap headers goc; request nay chi la ban tai dung.\n' : '') + (request.body?.approximate ? '# Body form tai dung: encoding/thu tu goc co the khac.\n' : '');
     return note + prefix + args.join(' \\\n  ');
   }
-  function raw(request) {
+  function raw(request, mode = 'minimal') {
     const url = validate(request);
     if (request.body?.base64 !== undefined) throw fail('Body binary: dùng Copy cURL để giữ nguyên bytes.');
     const text = request.body?.text;
     const lines = [`${request.method} ${url.pathname}${url.search} HTTP/1.1`, `Host: ${url.host}`];
-    for (const header of headers(request)) lines.push(`${header.name}: ${header.value || ''}`);
+    for (const header of headers(request, mode)) lines.push(`${header.name}: ${header.value || ''}`);
     if (text !== undefined) lines.push('Content-Length: ' + new TextEncoder().encode(text).length);
     return lines.join('\r\n') + '\r\n\r\n' + (text || '');
   }
-  function curlCmd(request) {
+  function curlCmd(request, mode = 'minimal') {
     validate(request);
     function cmdQuote(value) {
       const text = String(value);
@@ -82,8 +99,9 @@ globalThis.CTFNetwork = (() => {
       return crt.replace(/[^a-zA-Z0-9 _\-:=+~'\/.,?;*]/g, '^$&').replace(/%(?=[a-zA-Z0-9_])/g, '%^');
     }
     const args = ['curl.exe --globoff --path-as-is', '--request ' + cmdQuote(request.method), '--url ' + cmdQuote(request.url)];
-    for (const header of headers(request)) args.push('--header ' + cmdQuote(`${header.name}: ${header.value || ''}`));
-    if (request.headers?.some(header => header.name.toLowerCase() === 'accept-encoding')) args.push('--compressed');
+    const selected = headers(request, mode);
+    for (const header of selected) args.push('--header ' + cmdQuote(`${header.name}: ${header.value || ''}`));
+    if (selected.some(header => header.name.toLowerCase() === 'accept-encoding')) args.push('--compressed');
     let prefix = '';
     if (request.body?.base64 !== undefined || /[^\x20-\x7e]/.test(request.body?.text || '')) {
       const encoded = request.body.base64 ?? btoa(Array.from(new TextEncoder().encode(request.body.text), byte => String.fromCharCode(byte)).join(''));
@@ -97,5 +115,5 @@ globalThis.CTFNetwork = (() => {
     const note = (request.headersKnown === false ? 'REM Chrome khong cung cap headers goc; day la request tai dung.\r\n' : '') + (request.body?.approximate ? 'REM Body form tai dung; encoding/thu tu goc co the khac.\r\n' : '');
     return note + command;
   }
-  return { body, identity, upsert, curl, curlCmd, raw, isStatic };
+  return { body, identity, upsert, curl, curlCmd, raw, isStatic, groupEndpoints };
 })();

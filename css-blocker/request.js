@@ -1,19 +1,28 @@
 (() => {
   const $ = selector => document.querySelector(selector);
+  const t = (key, params) => CTFI18N.t(key, params);
+  let active;
   $('#closeRaw').addEventListener('click', () => $('#rawEditor').close());
+  $('#rawEditor').addEventListener('close', () => active?.abort());
+  $('#stopRaw').addEventListener('click', () => active?.abort());
   $('#rawRequest').addEventListener('input', () => { $('#rawError').textContent = ''; });
   $('#send').addEventListener('click', async () => {
-    let key;
     try {
-      $('#rawError').textContent = ''; $('#send').disabled = true;
-      const raw = $('#rawRequest').value, protocol = $('#protocol').value;
-      CTFReplay.parse(raw, protocol);
-      key = 'replay:' + crypto.randomUUID();
-      await chrome.storage.session.set({ [key]: { raw, protocol } });
-      await chrome.tabs.create({ url: chrome.runtime.getURL('response.html') + '#' + key });
-    } catch (error) {
-      if (key) await chrome.storage.session.remove(key).catch(() => {});
-      $('#rawError').textContent = error.message;
-    } finally { $('#send').disabled = false; }
+      $('#rawError').textContent = ''; $('#rawResult').hidden = true;
+      $('#send').disabled = true; $('#stopRaw').hidden = false;
+      active = new AbortController();
+      $('#rawError').textContent = t('Đang gửi…');
+      const result = await CTFReplay.send($('#rawRequest').value, $('#protocol').value, active.signal);
+      $('#rawSummary').textContent = `${result.status} ${result.statusText} · ${result.ms} ms · ${result.bytes.toLocaleString()} B`;
+      $('#rawSummary').className = result.ok && !result.html ? '' : 'error';
+      $('#rawTarget').textContent = `${result.method} ${result.url}`;
+      $('#rawHeaders').textContent = result.headers.map(([name,value])=>`${name}: ${value}`).join('\n');
+      $('#rawBody').textContent = result.body;
+      $('#rawBody').hidden = result.html;
+      $('#rawNotice').textContent = [result.html ? t('Không hiển thị response HTML. Chỉ hỗ trợ nội dung không phải HTML.') : '', result.skipped.length ? t('Header do trình duyệt kiểm soát, không gửi nguyên bản: {headers}', {headers:result.skipped.join(', ')}) : '', result.truncated ? t('Chỉ hiển thị 2 MiB đầu của response.') : ''].filter(Boolean).join(' ');
+      $('#rawError').textContent = ''; $('#rawResult').hidden = false;
+      $('#rawResult').scrollIntoView({ block:'nearest' });
+    } catch (error) { $('#rawError').textContent = active?.signal.aborted ? t('Đã dừng.') : error.message; }
+    finally { active = undefined; $('#send').disabled = false; $('#stopRaw').hidden = true; }
   });
 })();

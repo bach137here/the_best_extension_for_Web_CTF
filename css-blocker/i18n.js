@@ -1,12 +1,13 @@
 (() => {
   if (globalThis.CTFI18N) return;
   const english = {
+    'Chỉ nhận nội dung không phải HTML.': 'Non-HTML responses only.',
+    'Không hiển thị response HTML. Chỉ hỗ trợ nội dung không phải HTML.': 'HTML response skipped. Only non-HTML content is supported.',
+    'Fetch dùng cookie của trình duyệt; không thể đặt nguyên bản các header bị trình duyệt kiểm soát.': 'Fetch uses browser cookies; browser-controlled headers cannot be reproduced verbatim.',
     'Fetch không gửi Raw dạng Transfer-Encoding; hãy giải mã body trước.': 'Fetch cannot replay Transfer-Encoding framing; decode the body first.',
     'Dán và sửa Raw request': 'Paste and edit a Raw request',
     'Đóng': 'Close',
     'Gửi': 'Send',
-    'Response mở ở tab mới.': 'Response opens in a new tab.',
-    'Fetch dùng cookie của trình duyệt; không thể đặt nguyên bản các header bị trình duyệt kiểm soát. HTML chỉ hiển thị dạng văn bản.': 'Fetch uses browser cookies; browser-controlled headers cannot be reproduced verbatim. HTML is shown as text only.',
     'Đang gửi…': 'Sending…',
     'Dừng': 'Stop',
     'Đã dừng.': 'Stopped.',

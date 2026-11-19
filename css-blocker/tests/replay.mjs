@@ -2,7 +2,7 @@ import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
-const context=vm.createContext({URL,TextEncoder});
+const context=vm.createContext({URL,TextEncoder,TextDecoder,fetch,AbortController,setTimeout,clearTimeout,btoa});
 vm.runInContext(await readFile(new URL('../replay.js',import.meta.url),'utf8'),context);
 const parse=context.CTFReplay.parse;
 const raw='POST /login?q=%252F HTTP/1.1\r\nHost: example.test\r\nContent-Type: application/json\r\nCookie: session=demo\r\nAuthorization: Bearer demo\r\nX-CSRF-Token: token\r\nSec-Fetch-Site: same-origin\r\nContent-Length: 999\r\n\r\n{"name":"guest"}\r\n';
@@ -15,6 +15,12 @@ assert.equal(parse('GET / HTTP/1.1\nHost: [::1]:8000\n\n','http:').url,'http://[
 assert.equal(parse('custom / HTTP/1.1\nHost: test.local\n\n').method,'custom','Keep case of nonstandard methods');
 for(const text of ['GET / HTTP/1.1\n\n','GET / HTTP/1.1\nHost: a@b\n\n','GET / HTTP/1.1\nHost: a\nHost: b\n\n','TRACE / HTTP/1.1\nHost: a\n\n','GET / HTTP/1.1\nHost: a\n\nbody','GET / HTTP/1.1\nBad Header: x\nHost: a\n\n']) assert.throws(()=>parse(text));
 const server=createServer(async(req,res)=>{
+  if(req.url==='/html'){res.setHeader('Content-Type','text/html');res.end('<html><body>blocked</body></html>');return;}
+  if(req.url==='/fake-html'){res.setHeader('Content-Type','text/plain');res.end('<!-- demo --><div>blocked</div>');return;}
+  if(req.url==='/binary'){res.setHeader('Content-Type','application/octet-stream');res.end(Buffer.from([0,255,17]));return;}
+  if(req.url==='/big'){res.setHeader('Content-Type','text/plain');res.end('x'.repeat(2097153));return;}
+  if(req.url==='/utf16'){res.setHeader('Content-Type','text/plain; charset=utf-16le');res.end(Buffer.from('hello','utf16le'));return;}
+  if(req.url==='/pdf'){res.setHeader('Content-Type','application/pdf');res.end(Buffer.from([37,80,68,70,45,255]));return;}
   const chunks=[];for await(const chunk of req)chunks.push(chunk);
   res.setHeader('Content-Type','application/json');res.end(JSON.stringify({method:req.method,url:req.url,headers:req.headers,body:Buffer.concat(chunks).toString('utf8')}));
 });
@@ -25,5 +31,16 @@ try{
   const input=parse(`POST /echo?x=%252F HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nX-Check: yes\r\nContent-Type: text/plain\r\nContent-Length: 1\r\n\r\nline 1\r\nline 2`,'http:');
   const response=await fetch(input.url,{method:input.method,headers:input.headers,body:input.body});const echo=await response.json();
   assert.equal(echo.method,'POST');assert.equal(echo.url,'/echo?x=%252F');assert.equal(echo.body,'line 1\r\nline 2');assert.equal(echo.headers['x-check'],'yes');assert.equal(Number(echo.headers['content-length']),14);
+  const send=endpoint=>context.CTFReplay.send(`GET ${endpoint} HTTP/1.1\nHost: 127.0.0.1:${port}\n\n`,'http:');
+  assert.equal((await send('/echo')).html,false);
+  for(const endpoint of ['/html','/fake-html']){const result=await send(endpoint);assert.equal(result.html,true);assert.equal(result.body,'');}
+  assert.equal((await send('/binary')).body,'[base64]\nAP8R');
+  assert.equal((await send('/utf16')).body,'hello');
+  assert.equal((await send('/pdf')).body,'[base64]\nJVBERi3/');
+  const big=await send('/big');assert.equal(big.bytes,2097152);assert.equal(big.truncated,true);
+  assert.equal(context.CTFReplay.isHTML('application/xml','<code>42</code>'),false);
+  assert.equal(context.CTFReplay.isHTML('application/json','{"html":"<div>data</div>"}'),false);
+  assert.equal(context.CTFReplay.isHTML('text/plain',' '.repeat(10000)+'<?xml version="1.0"?><!-- demo --><html>blocked</html>'),true);
+  assert.equal(context.CTFReplay.isHTML('application/xml','<?xml version="1.0"?><!-- demo --><code>42</code>'),false);
 }finally{await new Promise(resolve=>server.close(resolve));}
 console.log('PASS: Raw parser, browser-controlled headers, exact body/newlines, safe authority resolution, invalid requests, and real fetch loopback.');

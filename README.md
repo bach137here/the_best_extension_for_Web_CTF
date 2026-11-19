@@ -2,7 +2,7 @@
 
 <h1 align="center">CTF Simple</h1>
 <p align="center"><strong>Less wallpaper. More flags.</strong><br>A small Chrome / Edge extension for getting straight to the useful parts of a web challenge.</p>
-<p align="center">Vanilla JavaScript · No build step · VI / EN interface · MIT · v3.3.0</p>
+<p align="center">Vanilla JavaScript · No build step · VI / EN interface · MIT · v3.3.1</p>
 
 Remove the CSS. Spot a suspicious `.view-source`. Unmask an input. Copy a request. Keep solving.
 
@@ -73,7 +73,7 @@ Exports keep the full URL. Repeated requests with the same tab, method, URL, and
 
 ### 4. Paste Raw. Edit. Send.
 
-Click the small **Raw ↗** button in the request toolbar. A blank editor opens **inside the extension popup**. Paste your Raw request, edit it, choose HTTP or HTTPS, and press **Send**. The response opens in a **new browser tab**, with status, headers, and body.
+Click the small **Raw Fetch** button in the request toolbar. A blank editor opens **inside the extension popup**. Paste your Raw request, edit it, choose HTTP or HTTPS, and press **Send**. Status, headers, and body appear **directly below the editor**, with no new browser tab. You can edit and send again in the same panel.
 
 ```http
 POST /login HTTP/1.1
@@ -83,11 +83,13 @@ Content-Type: application/json
 {"username":"guest","password":"demo"}
 ```
 
-Raw Fetch uses the browser's `fetch` API and cookie jar. You cannot manually reproduce browser-controlled headers such as Cookie, Host, Origin, or Sec-*; omitted names are listed in the response tab. GET/HEAD bodies and unsupported methods are rejected. Use cURL when you need closer control of the wire request. Responses are shown as text, including HTML, with a 30-second timeout and a 2 MiB preview limit. Refreshing a response tab does not resend the request.
+Raw Fetch only previews **non-HTML responses** such as JSON, text, and XML. HTML/XHTML MIME types are rejected, and common HTML markup is detected when a server labels it incorrectly. The request is sent first; this filters its response, not its server-side effects. Binary data is displayed as base64. Previews have a 30-second timeout and a 2 MiB limit; use **Stop** to cancel a pending request.
+
+Raw Fetch uses the browser's `fetch` API and cookie jar. You cannot manually reproduce browser-controlled headers such as Cookie, Host, Origin, or Sec-*; omitted names are listed below the response. GET/HEAD bodies and unsupported methods are rejected. Use cURL when you need closer control of the wire request. Responses are not saved when the popup closes.
 
 The editor sends UTF-8 text and normalizes pasted line endings to LF. Transfer-encoded/chunked Raw bodies are rejected rather than sent with incorrect framing. It is not a byte-exact raw socket client. [Chrome host permissions](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests) enable cross-origin Fetch; [browser-controlled headers](https://developer.mozilla.org/en-US/docs/Glossary/Forbidden_request_header) remain restricted.
 
-| Edit inside the popup | Read the response in a new tab |
+| Edit inside the popup | Read the response below the editor |
 | --- | --- |
 | ![Raw editor inside the extension popup](docs/screenshots/raw-editor.png) | ![Fetch response with status, headers, and text body](docs/screenshots/fetch-response.png) |
 

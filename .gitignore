@@ -1,0 +1,25 @@
+# Operating systems and editors
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Local secrets and dependencies
+.env
+.env.*
+!.env.example
+node_modules/
+
+# Distribution archives and generated CMD fixture
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+cmd-fixture-commands.txt
+css-blocker/tests/demo-context.json

@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import { readFile } from 'node:fs/promises';
+const context = vm.createContext({ URL });
+let source = '';
+try { source = await readFile(new URL('../policy.js', import.meta.url), 'utf8'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+vm.runInContext(source, context);
+assert.ok(context.CTFPolicy, 'Shared exclusion policy must exist');
+const policy = context.CTFPolicy;
+assert.equal(policy.keys('https://Example.COM:8443/admin?x=1#hash').site, 'example.com');
+assert.equal(policy.keys('https://Example.COM:8443/admin?x=1#hash').endpoint, 'example.com/admin');
+const site = { disabledSites: ['example.com'] };
+assert.equal(policy.reason('http://example.com:8080/anything', site), 'site');
+assert.equal(policy.reason('https://sub.example.com/anything', site), null);
+const endpoint = { disabledEndpoints: ['example.com/admin'] };
+assert.equal(policy.reason('https://example.com/admin?payload=other#fragment', endpoint), 'endpoint');
+assert.equal(policy.reason('http://example.com:9000/admin', endpoint), 'endpoint');
+assert.equal(policy.reason('https://example.com/admin/users', endpoint), null);
+assert.equal(policy.reason('https://example.com/admin/', endpoint), null);
+assert.equal(policy.reason('https://example.com/Admin', endpoint), null);
+assert.equal(policy.reason('https://other.test/admin', endpoint), null);
+assert.equal(policy.isDisabled('invalid', endpoint), false);
+assert.equal(policy.isDisabled('https://example.com/admin', { disabledEndpoints: 'bad setting' }), false);
+console.log('PASS: hostname scope, exact endpoint, query/hash independence, subdomain/path isolation and malformed settings.');

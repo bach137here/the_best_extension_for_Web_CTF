@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Packet Picnic — CTF Simple demo</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f0f2f5;color:#253648;font:14px/1.55 system-ui,sans-serif}
+    .masthead{background:#203f34;color:#fff9ed;padding:16px 32px;display:flex;justify-content:space-between;align-items:center}.masthead strong{font-size:22px;letter-spacing:-.7px}.masthead span{font-size:11px;letter-spacing:1px;color:#bde8cc}
+    nav{padding:10px 32px;background:white;border-bottom:1px solid #dce3e8;display:flex;gap:28px}a{color:#49715c;text-decoration:none}.promo{margin:20px 28px 0;padding:14px 20px;background:#fff0cf;border:1px solid #ecd6a5;border-radius:10px;color:#846634}
+    main{max-width:1080px;margin:22px auto;padding:0 28px}.hero{margin-bottom:20px}.hero h1{font-size:28px;letter-spacing:-.8px;margin:0 0 4px}.hero p{margin:0;color:#7a8792}.layout{display:flex;align-items:flex-start;gap:20px}.challenge{flex:1;min-width:0}.card{padding:20px;background:white;border:1px solid #dee5e9;border-radius:12px;margin-bottom:16px}h2{font-size:16px;margin:0 0 8px}form p{margin:0 0 14px;color:#778592;font-size:12px}label{display:block;font-size:12px;font-weight:600;margin-bottom:12px}input{display:block;margin-top:5px;padding:9px 11px;width:100%;border:1px solid #cbd8d0;border-radius:6px;background:#fcfdfc;color:#274537;font:13px Consolas,monospace}button{padding:9px 17px;border:0;border-radius:6px;background:#275b42;color:white;font:600 12px system-ui;cursor:pointer}pre{font:12px/1.7 Consolas,monospace;margin:0;white-space:pre-wrap;overflow-wrap:anywhere;color:#28654a;background:#eef6f0;border-radius:7px;padding:13px}.sidebar{width:240px;flex:none}.sidebar p{font-size:12px;color:#7a8792;margin:8px 0}.badge{display:inline-block;padding:3px 8px;background:#e9edf1;border-radius:5px;font-size:10px;color:#718396}.sidebar ul{padding-left:18px;font-size:12px;line-height:2;color:#637282}.site-footer{text-align:center;font-size:11px;color:#8b959d;padding:10px 20px 20px}
+    .view-source{color:#275b42}.flag{font-weight:bold}.secret-panel{display:none}
+  </style>
+</head>
+<body>
+  <header class="masthead"><strong>Packet Picnic</strong><span>THE VERY BUSY CHALLENGE PORTAL</span></header>
+  <nav><a href="#">Home</a><a href="#">Announcements</a><a href="#">Leaderboard</a><a href="#">Community</a><a href="#">Merch nobody asked for</a></nav>
+  <div class="promo"><strong>Important announcement!</strong> Our imaginary sponsor has 37 things to tell you before you can solve this challenge.</div>
+  <main>
+    <div class="hero"><h1>Find the signal. Ignore the confetti.</h1><p>A deliberately cluttered, local-only page for trying CTF Simple.</p></div>
+    <div class="layout">
+      <div class="challenge">
+        <form id="challenge-form" class="card">
+          <h2>Inspect a user</h2><p>Change the input. Submit. Read the output. That is the whole challenge.</p>
+          <label>Username<input name="username" value="guest" required maxlength="8"></label>
+          <label>Access key<input name="key" type="password" value="demo-only" readonly></label>
+          <button type="submit">Inspect user →</button>
+        </form>
+        <section id="response" class="card"><h2>Response</h2><pre id="demo-output">{
+  "user": "guest",
+  "role": "visitor",
+  "hint": "Try a different username."
+}</pre></section>
+      </div>
+      <aside class="sidebar">
+        <div class="card"><span class="badge">UNRELATED NEWS</span><h2 style="margin-top:10px">More things to scroll past</h2><p>The leaderboard is very competitive. The wallpaper is very green. None of this helps with the form.</p></div>
+        <div class="card"><h2>Recommended reading</h2><ul><li>Ten reasons to add a sidebar</li><li>Our weekly cookie rankings</li><li>Another long announcement</li></ul></div>
+      </aside>
+    </div>
+  </main>
+  <footer class="site-footer">Synthetic demo · No accounts, real credentials, or external requests · Toggle Zen off to bring the clutter back.</footer>
+  <script>
+    document.querySelector('#challenge-form').addEventListener('submit', event => {
+      event.preventDefault();
+      const user = new FormData(event.target).get('username');
+      document.querySelector('#demo-output').textContent = JSON.stringify({ user, role: user === 'admin' ? 'administrator' : 'visitor', hint: 'Demo response only. No request was sent.' }, null, 2);
+    });
+  </script>
+</body>
+</html>

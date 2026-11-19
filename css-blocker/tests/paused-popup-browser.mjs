@@ -1,0 +1,15 @@
+import { readFile } from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const { origin } = JSON.parse(await readFile(new URL('./demo-context.json', import.meta.url)));
+const task = await taskSpace('CTF simple verification');
+const page = task.page('p1');
+await page.goto(origin + '/popup');
+await page.waitForFunction(() => !document.querySelector('#language').disabled);
+await page.evaluate(() => chrome.storage.local.set({ disabledEndpoints: ['demo.ctf/challenge'] }));
+await page.reload();
+await page.waitForFunction(() => !document.querySelector('#endpointRule').disabled && document.querySelector('#block').disabled);
+assert.equal(await page.evaluate(() => document.querySelectorAll('.request').length), 0);
+await page.click('#endpointRule');
+await page.waitForFunction(() => !document.querySelector('#block').disabled && document.querySelectorAll('.request').length === 4 && document.querySelectorAll('#hints li').length === 5);
+assert.equal(await page.evaluate(() => document.querySelector('#requestCount').textContent), '4');
+console.log('PASS: initially excluded popup resumes request polling and hints without reopening.');

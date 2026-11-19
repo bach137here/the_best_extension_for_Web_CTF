@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+const task = await taskSpace('CTF simple verification');
+const page = task.page('p1');
+await page.goto('data:text/html,' + encodeURIComponent('<!doctype html><p>Raw URL input fixture</p>'));
+await page.evaluate(() => { globalThis.chrome = { storage: { local: { get: async () => ({ prefs: { urlBar: true } }), set: async () => {} }, onChanged: { addListener() {} } }, runtime: { sendMessage: async () => ({ ok: true }) } }; });
+for (const file of ['dom-guard.js', 'page.js']) await page.evaluate(await readFile(new URL(`../${file}`, import.meta.url), 'utf8'));
+await page.waitForFunction(() => !!document.querySelector('ctf-toolbar')?.shadowRoot.querySelector('input'));
+const raw = 'https://ctf.test/đường dẫn?q=%252F&text=a b';
+const selector = 'loc=css:input[placeholder="URL nguyên chuỗi · không tự encode"]';
+await page.fill(selector, raw);
+await page.press(selector, 'Tab');
+await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 1100)));
+assert.equal(await page.evaluate(() => document.querySelector('ctf-toolbar').shadowRoot.querySelector('input').value), raw, 'Blur/timer must not replace text with canonical URL');
+await page.evaluate(() => { globalThis.chrome.runtime.sendMessage = async message => { globalThis.lastCTFMessage = message; return { ok: true }; }; });
+await page.click('loc=role:button[name="Mở nguyên chuỗi URL"]');
+assert.equal(await page.evaluate(() => globalThis.lastCTFMessage.url), raw, 'Navigate must receive the exact entered string');
+await page.goto('data:text/html,' + encodeURIComponent('<!doctype html><p>Address restore fixture</p>'));
+await page.evaluate(raw => {
+  globalThis.chrome = { storage: { local: { get: async () => ({ prefs: { urlBar: true } }), set: async () => {} }, onChanged: { addListener() {} } }, runtime: { sendMessage: async () => ({ raw }) } };
+}, raw);
+for (const file of ['dom-guard.js', 'page.js']) await page.evaluate(await readFile(new URL(`../${file}`, import.meta.url), 'utf8'));
+await page.waitForFunction(raw => document.querySelector('ctf-toolbar')?.shadowRoot.querySelector('input').value === raw, raw);
+console.log('PASS: raw Unicode/spaces/%xx preserved during edit, blur, timer, navigation argument and restored address display.');

@@ -1,0 +1,53 @@
+import { readFile, writeFile } from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const { origin } = JSON.parse(await readFile(new URL('./demo-context.json', import.meta.url)));
+const task = await taskSpace('CTF simple verification');
+const page = task.page('p1');
+await page.goto(origin + '/popup?lang=en');
+await page.waitForFunction(() => !document.querySelector('#block').disabled);
+assert.equal(await page.evaluate(() => document.querySelector('#hintSearch')), null);
+assert.equal(await page.evaluate(() => document.querySelector('.donate').getAttribute('href')), 'https://ko-fi.com/bachphan');
+await page.evaluate(async () => {
+  await chrome.storage.local.set({ language: 'en' });
+  CTFI18N.setLanguage('en'); CTFI18N.apply(document); document.querySelector('#language').checked = true;
+  renderScope(); renderHints(); renderRequests(); status(lastStatus);
+  requests[0].url = 'https://demo.ctf/api/very/long/path/with/details?search=demo%20data&filter=include-all-records-and-fields&next=%2Fadmin%2Fdashboard';
+  renderRequests();
+});
+await page.click('.request:first-child .expand-url');
+assert.ok(await page.evaluate(() => { const detail = document.querySelector('.url-detail'); return !detail.hidden && detail.textContent.endsWith('%2Fdashboard') && detail.scrollWidth <= detail.clientWidth; }));
+assert.equal(await page.evaluate(() => document.body.scrollHeight), 590);
+async function print(name, width = 780, height = 590) {
+  const pdf = await page.cdp('Page.printToPDF', { printBackground: true, paperWidth: width/96, paperHeight: height/96, marginTop: 0, marginBottom: 0, marginLeft: 0, marginRight: 0, scale: 1 });
+  await writeFile(new URL('../../docs/screenshots/' + name + '.pdf', import.meta.url), Buffer.from(pdf.data, 'base64'));
+}
+await print('popup-en');
+await page.click('#language');
+await page.waitForFunction(() => document.querySelector('#block').textContent.includes('Chặn'));
+assert.equal(await page.evaluate(() => document.querySelector('.expand-url').title), 'Thu gọn URL');
+await print('popup-vi');
+await page.goto(origin + '/page/demo');
+await page.waitForFunction(() => !!globalThis.CTFPage);
+await page.evaluate(async () => { await CTFPageReady; await CTFPage.ready; });
+await page.evaluate(() => chrome.storage.local.set({ prefs: { passwords: true, reveal: true, unlock: true, textInputs: true, copy: true, urlBar: true } }));
+await page.waitForFunction(() => [...document.querySelectorAll('*')].some(el => el.shadowRoot?.querySelector('input')));
+assert.equal(await page.evaluate(() => document.querySelector('#password').type), 'text');
+await print('urlbar', 1150, 640);
+await page.goto(origin + '/zen-demo');
+await page.waitForFunction(() => !!globalThis.CTFPage);
+await page.evaluate(async () => {
+  await CTFPageReady; await CTFPage.ready;
+  await chrome.storage.local.set({ language: 'en', prefs: { passwords: true, reveal: true, unlock: true, textInputs: true, copy: true, urlBar: false }, [`zen:${location.hostname}`]: false });
+});
+await page.waitForFunction(() => getComputedStyle(document.querySelector('.masthead')).display !== 'none');
+await print('zen-before', 1040, 800);
+await page.evaluate(() => chrome.storage.local.set({ [`zen:${location.hostname}`]: true }));
+await page.waitForFunction(() => getComputedStyle(document.querySelector('.masthead')).display === 'none');
+assert.ok(await page.evaluate(() => getComputedStyle(document.querySelector('.sidebar')).display === 'none' && getComputedStyle(document.querySelector('#challenge-form')).display !== 'none' && getComputedStyle(document.querySelector('#response')).display !== 'none'));
+await page.fill('input[name=username]', 'admin');
+await page.click('button[type=submit]');
+await page.waitForFunction(() => document.querySelector('#demo-output').textContent.includes('administrator'));
+await print('zen-after', 1040, 800);
+await page.evaluate(() => chrome.storage.local.set({ [`zen:${location.hostname}`]: false }));
+await page.waitForFunction(() => getComputedStyle(document.querySelector('.masthead')).display !== 'none');
+console.log('PASS: CSS search removed, donation link, VI/EN, expanded URL, no outer scroll; real Zen hides static clutter, keeps a working form/output, and restores the page. Five previews rendered.');

@@ -1,0 +1,129 @@
+(() => {
+  if (globalThis.CTFI18N) return;
+  const english = {
+    'Mở rộng URL': 'Expand URL',
+    'Thu gọn URL': 'Collapse URL',
+    'Chặn CSS mạnh': 'Block CSS strongly',
+    'Khôi phục CSS': 'Restore CSS',
+    'Thanh URL': 'URL bar',
+    'Đang mở…': 'Opening…',
+    'CSS đáng chú ý': 'Notable CSS',
+    'Nhóm CSS': 'CSS group',
+    'Từ khóa CTF': 'CTF keywords',
+    'Chưa khớp DOM': 'Not matched in DOM',
+    'Ẩn nội dung': 'Hidden content',
+    'Tất cả tên': 'All names',
+    'Đang đọc…': 'Reading…',
+    'Chỉ tên class/id.': 'Class/id names only.',
+    'Tự động hỗ trợ': 'Automatic helpers',
+    'Hiện mật khẩu': 'Show passwords',
+    'Hiện nội dung ẩn': 'Show hidden content',
+    'Bỏ giới hạn form': 'Remove form restrictions',
+    'Input đặc biệt → text': 'Special inputs → text',
+    'Gỡ chặn copy / paste': 'Allow copy / paste',
+    'Tải lại tab, bỏ qua cache để ghi lại tài nguyên': 'Reload the tab without cache to record resources',
+    'Reload & ghi': 'Reload & capture',
+    'Đọc lại log và CSS': 'Read logs and CSS again',
+    'Đọc lại': 'Refresh',
+    'Xóa': 'Clear',
+    'Tìm đường dẫn… /admin': 'Search path… /admin',
+    'Lọc requests': 'Filter requests',
+    'Status code, ví dụ 403 hoặc 4xx': 'Status code, e.g. 403 or 4xx',
+    'Loại request': 'Request type',
+    'Tất cả loại': 'All types',
+    'Tài nguyên': 'Assets',
+    'SW / nền': 'SW / background',
+    'Lỗi': 'Errors',
+    'Mọi Content-Type': 'All Content-Types',
+    'Ảnh': 'Images',
+    'Chưa có MIME': 'No MIME type',
+    'Danh sách requests': 'Request list',
+    'Chỉ hostname hiện tại · cURL/raw giữ URL đầy đủ. Reload & ghi để bắt lần tải trang; memory cache có thể không xuất hiện.': 'Current hostname only · cURL/raw keep the full URL. Reload & capture to record page loads; memory cache may not appear.',
+    'Nội dung để copy thủ công': 'Content to copy manually',
+    'Không có tên phù hợp bộ lọc.': 'No names match the filter.',
+    'Chỉ tên class/id · chưa khớp ≠ không bao giờ dùng.': 'Class/id names only · unmatched ≠ never used.',
+    ' {count} stylesheet không đọc được.': ' {count} stylesheets could not be read.',
+    '{count} stylesheet không đọc được.': '{count} stylesheets could not be read.',
+    'Đã copy.': 'Copied.',
+    'Dùng Ctrl+C để copy nội dung bên dưới.': 'Press Ctrl+C to copy the content below.',
+    '{count} đang hiện · {total} lượt đã ghi trong các nhóm này': '{count} shown · {total} requests recorded in these groups',
+    'Đang tải': 'Loading',
+    'Copy cURL cho Bash': 'Copy cURL for Bash',
+    'Copy cURL cho Windows CMD (dán trực tiếp)': 'Copy cURL for Windows CMD (paste directly)',
+    'Copy HTTP/1.1 tái dựng': 'Copy reconstructed HTTP/1.1',
+    ' · Body form tái dựng, có thể khác encoding/thứ tự gốc': ' · Reconstructed form body; encoding/order may differ from the original',
+    'Đã ghi WebSocket handshake; đây không phải request HTTP để phát lại bằng cURL/raw.': 'WebSocket handshake recorded; this is not an HTTP request that can be replayed with cURL/raw.',
+    'SW/nền': 'SW/background',
+    'thiếu headers': 'missing headers',
+    'thiếu body': 'missing body',
+    'Không có request khớp bộ lọc.': 'No requests match the filter.',
+    'Chưa có request. Bấm Reload & ghi để bắt lần tải trang.': 'No requests yet. Click Reload & capture to record page loads.',
+    'Có thể thiếu log do lỗi ghi: {error}. Xóa log để đặt lại cảnh báo.': 'Logs may be missing due to a recording error: {error}. Clear logs to reset the warning.',
+    'CSS đã chặn · ghi nhớ qua refresh.': 'CSS blocked · remembered across reloads.',
+    'Đang tải lại để khôi phục CSS.': 'Reloading to restore CSS.',
+    'Thanh URL đã hiện trên trang · Alt+L để nhập.': 'URL bar shown on the page · Alt+L to type.',
+    'Đã ẩn thanh URL.': 'URL bar hidden.',
+    'Đã lưu lựa chọn.': 'Preferences saved.',
+    'Zen: giữ điều khiển và kết quả; ẩn phần tĩnh.': 'Zen: keep controls and results; hide static content.',
+    'Đã tắt Zen.': 'Zen disabled.',
+    'Đang tải lại, bỏ qua cache để ghi requests.': 'Reloading without cache to record requests.',
+    'Đã làm mới.': 'Refreshed.',
+    'Đã xóa request của tab và nền cùng origin.': 'Cleared requests from this tab and background requests from the same origin.',
+    'Mở một trang web HTTP/HTTPS để dùng.': 'Open an HTTP/HTTPS webpage to use this extension.',
+    'Không đọc được requests: {error}': 'Could not read requests: {error}',
+    'CSS đang bị chặn · refresh vẫn giữ.': 'CSS is blocked · persists across reloads.',
+    'Sẵn sàng · hỗ trợ form đã tự áp dụng.': 'Ready · form helpers applied automatically.',
+    'Quay lại': 'Back',
+    'Tải lại': 'Reload',
+    'URL nguyên chuỗi · không tự encode': 'Raw URL · no automatic encoding',
+    'URL thực tế của Chrome: {url}': 'Actual Chrome URL: {url}',
+    'URL nguyên chuỗi': 'Raw URL',
+    'Chỉ mở URL HTTP/HTTPS.': 'Only HTTP/HTTPS URLs can be opened.',
+    'Mở': 'Open',
+    'Mở nguyên chuỗi URL': 'Open the raw URL',
+    'Copy URL nguyên chuỗi': 'Copy the raw URL',
+    'Tắt Zen': 'Disable Zen',
+    'Ẩn thanh URL': 'Hide URL bar',
+    'Chỉ xuất request HTTP/HTTPS.': 'Only HTTP/HTTPS requests can be exported.',
+    'Body không đầy đủ; không thể xuất request chính xác.': 'Incomplete body; the request cannot be exported accurately.',
+    'Body multipart/form thiếu bytes gốc; không thể xuất chính xác.': 'Multipart/form body is missing original bytes; accurate export is unavailable.',
+    'Body binary: dùng Copy cURL để giữ nguyên bytes.': 'Binary body: use Copy cURL to preserve the original bytes.',
+    'Header/URL chứa ký tự điều khiển không dùng trực tiếp trong CMD.': 'Header/URL contains control characters that cannot be used directly in CMD.',
+    'Body base64 không hợp lệ.': 'Invalid base64 body.',
+    'Lệnh quá dài cho CMD; dùng cURL Bash hoặc lưu request vào file.': 'Command too long for CMD; use Bash cURL or save the request to a file.',
+    'Tắt cho trang này': 'Disable for this site',
+    'Bật cho trang này': 'Enable for this site',
+    'Tắt cho endpoint này': 'Disable for this endpoint',
+    'Bật cho endpoint này': 'Enable for this endpoint',
+    'Đang bật': 'Enabled',
+    'Đã tắt cho trang này': 'Disabled for this site',
+    'Đã tắt cho endpoint này': 'Disabled for this endpoint',
+    'Đang tải lại để áp dụng lựa chọn.': 'Reloading to apply your preferences.',
+    'Đã tắt công cụ trên trang này. Các thiết lập được giữ lại.': 'Tools are disabled on this site. Your settings are preserved.',
+    'Ngôn ngữ': 'Language',
+    'Tắt theo trang': 'Disable by site',
+    'Không áp dụng cho hostname/endpoint này.': 'Do not apply to this hostname/endpoint.'
+  };
+  globalThis.CTFI18N = {
+    language: 'vi',
+    setLanguage(language) { this.language = language === 'en' ? 'en' : 'vi'; },
+    t(source, params = {}) {
+      const text = this.language === 'en' && Object.hasOwn(english, source) ? english[source] : source;
+      return String(text).replace(/\{(\w+)\}/g, (match, key) => Object.hasOwn(params, key) ? String(params[key]) : match);
+    },
+    apply(root = globalThis.document) {
+      if (!root) return;
+      const bindings = [['data-i18n', null], ['data-i18n-placeholder', 'placeholder'], ['data-i18n-title', 'title'], ['data-i18n-label', 'aria-label']];
+      const selector = bindings.map(([annotation]) => `[${annotation}]`).join(',');
+      const nodes = [...root.querySelectorAll(selector)];
+      if (root.hasAttribute && bindings.some(([annotation]) => root.hasAttribute(annotation))) nodes.unshift(root);
+      for (const node of nodes) for (const [annotation, attribute] of bindings) {
+        if (!node.hasAttribute(annotation)) continue;
+        const key = node.getAttribute(annotation) || (attribute ? node.getAttribute(attribute) : node.textContent) || '';
+        node.setAttribute(annotation, key);
+        if (attribute) node.setAttribute(attribute, this.t(key));
+        else node.textContent = this.t(key);
+      }
+    }
+  };
+})();

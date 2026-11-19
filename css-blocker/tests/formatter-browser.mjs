@@ -1,0 +1,21 @@
+import { readFile } from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const task = await taskSpace('CTF simple verification');
+const page = task.page('p1');
+// Markup/state contract read from installed Code Formatter 1.7.0 (bhim...dfal).
+const html = `<!doctype html><body class="code-formatter-is-loaded"><pre id="original" hidden style="display:none">{"flag":"example"}</pre><div id="code-formatter-renderer" class="code-formatter-renderer"><div class="cm-editor"><textarea id="technical" style="opacity:0" readonly>editor clipboard</textarea></div></div><div class="code-formatter-toolbar"><div id="dropdown" class="code-formatter-toolbar__dropdown-menu" style="display:none"><input id="internal" type="hidden" required readonly></div></div></body>`;
+await page.goto('data:text/html,' + encodeURIComponent(html));
+await page.evaluate(() => { globalThis.chrome = { storage: { local: { get: async () => ({}), set: async () => {} }, onChanged: { addListener() {} } }, runtime: { sendMessage: async () => ({}) } }; });
+for (const file of ['dom-guard.js', 'page.js']) await page.evaluate(await readFile(new URL(`../${file}`, import.meta.url), 'utf8'));
+await page.waitForFunction(() => !!globalThis.CTFPage);
+await page.evaluate(async () => { await globalThis.CTFPage.ready; });
+assert.equal(await page.evaluate(() => document.querySelector('#original').hidden), true);
+assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#original')).display), 'none');
+assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#dropdown')).display), 'none');
+assert.equal(await page.evaluate(() => document.querySelector('#internal').type), 'hidden');
+assert.equal(await page.evaluate(() => document.querySelector('#internal').required && document.querySelector('#internal').readOnly), true);
+assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#technical')).opacity), '0');
+await page.evaluate(() => { document.querySelector('#internal').value = 'changed by formatter'; document.querySelector('#original').hidden = false; document.querySelector('#original').style.display = 'block'; });
+await page.waitForFunction(() => document.querySelector('#internal').value === 'changed by formatter' && !document.querySelector('#original').hidden);
+assert.equal(await page.evaluate(() => document.querySelector('#internal').type), 'hidden');
+console.log('PASS: Code Formatter original PRE/dropdown stay hidden, editor textarea stays technical, and formatter can toggle its own view.');

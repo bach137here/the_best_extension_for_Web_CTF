@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="vi">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CTF Simple</title><link rel="stylesheet" href="popup.css"></head>
+<body>
+  <header><div><span class="eyebrow">WEB INSPECTION WORKSPACE</span><h1>CTF Simple <span id="site"></span></h1></div><div class="header-tools"><label class="language-switch"><span>VI</span><input id="language" type="checkbox" role="switch" aria-label="Ngôn ngữ" data-i18n-label="Ngôn ngữ" disabled><span>EN</span></label><span class="live"><i></i> LIVE NETWORK</span></div></header>
+  <div class="toolbar">
+    <button id="block" class="primary" data-i18n disabled>Chặn CSS mạnh</button>
+    <button id="restore" data-i18n disabled>Khôi phục CSS</button>
+    <label class="toggle"><input id="urlBar" data-pref="urlBar" type="checkbox" disabled><span data-i18n>Thanh URL</span></label>
+    <label class="toggle"><input id="zen" type="checkbox" disabled>Zen mode</label>
+  </div>
+  <div class="scope-controls"><button id="siteRule" disabled>Tắt cho trang này</button><button id="endpointRule" disabled>Tắt cho endpoint này</button><span id="scopeState"></span></div>
+  <p id="status" role="status" aria-live="polite">Đang mở…</p>
+  <main class="workspace">
+    <aside>
+      <section class="hint-panel">
+        <div class="heading"><h2 data-i18n>CSS đáng chú ý</h2><span id="hintCount" class="counter">0</span></div>
+        <select id="hintFilter" aria-label="Nhóm CSS" data-i18n-label="Nhóm CSS"><option value="ctf" data-i18n>Từ khóa CTF</option><option value="unused" data-i18n>Chưa khớp DOM</option><option value="hidden" data-i18n>Ẩn nội dung</option><option value="all" data-i18n>Tất cả tên</option></select>
+        <ul id="hints" class="names"><li>Đang đọc…</li></ul>
+        <p id="hintNote" class="note" data-i18n>Chỉ tên class/id.</p>
+      </section>
+      <section class="helpers">
+        <h2 data-i18n>Tự động hỗ trợ</h2>
+        <label><input data-pref="passwords" type="checkbox" checked disabled><span data-i18n>Hiện mật khẩu</span></label>
+        <label><input data-pref="reveal" type="checkbox" checked disabled><span data-i18n>Hiện nội dung ẩn</span></label>
+        <label><input data-pref="unlock" type="checkbox" checked disabled><span data-i18n>Bỏ giới hạn form</span></label>
+        <label><input data-pref="textInputs" type="checkbox" checked disabled><span data-i18n>Input đặc biệt → text</span></label>
+        <label><input data-pref="copy" type="checkbox" checked disabled><span data-i18n>Gỡ chặn copy / paste</span></label>
+      </section>
+    </aside>
+    <section class="network-panel">
+      <div class="heading"><h2>Requests <span id="requestCount" class="counter">0</span></h2><button id="reload" class="small" title="Tải lại tab, bỏ qua cache để ghi lại tài nguyên" data-i18n-title="Tải lại tab, bỏ qua cache để ghi lại tài nguyên" data-i18n disabled>Reload & ghi</button><button id="refresh" class="small" title="Đọc lại log và CSS" data-i18n-title="Đọc lại log và CSS" data-i18n disabled>Đọc lại</button><button id="clear" class="small" data-i18n disabled>Xóa</button></div>
+      <div class="filters">
+        <input id="requestSearch" type="search" placeholder="Tìm đường dẫn… /admin" aria-label="Lọc requests" data-i18n-placeholder="Tìm đường dẫn… /admin" data-i18n-label="Lọc requests">
+        <input id="requestStatus" type="search" placeholder="Status" list="statusCodes" aria-label="Status code, ví dụ 403 hoặc 4xx" data-i18n-label="Status code, ví dụ 403 hoặc 4xx">
+        <datalist id="statusCodes"><option value="2xx"><option value="3xx"><option value="4xx"><option value="5xx"><option value="200"><option value="201"><option value="204"><option value="302"><option value="304"><option value="400"><option value="401"><option value="403"><option value="404"><option value="429"><option value="500"><option value="502"><option value="error"></datalist>
+        <select id="requestMethod" aria-label="Method"><option value="all">Method</option><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>OPTIONS</option><option>HEAD</option></select>
+      </div>
+      <div class="filters category-filters">
+        <select id="requestType" aria-label="Loại request" data-i18n-label="Loại request"><option value="all" data-i18n>Tất cả loại</option><option value="api">Fetch / XHR</option><option value="document">Document</option><option value="websocket">WebSocket</option><option value="background" data-i18n>SW / nền</option><option value="error" data-i18n>Lỗi</option></select>
+        <select id="requestContent" aria-label="Content-Type"><option value="all" data-i18n>Mọi Content-Type</option><option value="json">JSON</option><option value="html">HTML</option><option value="javascript">JavaScript</option><option value="css">CSS</option><option value="image" data-i18n>Ảnh</option><option value="text">Text</option><option value="xml">XML</option><option value="media">Audio / Video</option><option value="font">Font</option><option value="unknown" data-i18n>Chưa có MIME</option></select>
+      </div>
+      <div class="table-head"><span>METHOD</span><span>URL / TYPE</span><span>STATUS</span><span>COPY</span></div>
+      <div id="requests" class="requests" aria-label="Danh sách requests" data-i18n-label="Danh sách requests"></div>
+      <p id="captureNote" class="note capture-note">Chỉ hostname hiện tại · cURL/raw giữ URL đầy đủ. Reload & ghi để bắt lần tải trang; memory cache có thể không xuất hiện.</p>
+    </section>
+  </main>
+  <footer><span class="credit">Made by Bach Phan ft. Codex with Love <span aria-hidden="true">♥</span></span><a class="donate" href="https://ko-fi.com/bachphan" target="_blank" rel="noopener noreferrer">Enjoyed it? Buy me a cookie 🍪: <strong>Ko-fi ↗</strong></a></footer>
+  <textarea id="copyFallback" hidden readonly aria-label="Nội dung để copy thủ công" data-i18n-label="Nội dung để copy thủ công"></textarea>
+  <script src="policy.js"></script><script src="i18n.js"></script><script src="network.js"></script><script src="popup.js"></script>
+</body></html>

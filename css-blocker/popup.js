@@ -101,7 +101,7 @@ function renderRequests() {
       const choose = () => {
         selected = entry.variants[Number(chooser.value) || 0];
         const parsed = new URL(selected.url); address.textContent = parsed.pathname + parsed.search; url.title = selected.url;
-        payload.textContent = selected.body?.text ?? (selected.body?.base64 !== undefined ? 'base64: ' + selected.body.base64 : '');
+        payload.textContent = selected.body?.text !== undefined ? CTFBody.format(selected.body.text) : selected.body?.base64 !== undefined ? 'base64: ' + selected.body.base64 : '';
         payload.hidden = !payload.textContent;
         refreshSelection();
       };
@@ -110,6 +110,10 @@ function renderRequests() {
       chooser.addEventListener('change', () => { choose(); selectedVariants.set(key, CTFNetwork.identity(selected)); });
       detail.append(chooser, address, payload); choose();
     }
+    const responseHeading=document.createElement('h4'); responseHeading.textContent=t('Body phản hồi');
+    const responseNote=document.createElement('p'); responseNote.className='note';
+    const responseBody=document.createElement('pre'); responseBody.className='response-body';
+    detail.append(responseHeading,responseNote,responseBody);
     const updateExpanded = () => {
       const open = expandedRequests.has(key);
       detail.hidden = !open; expand.textContent = open ? '▴' : '▾';
@@ -139,6 +143,11 @@ function renderRequests() {
     const meta = document.createElement('p'); meta.className = 'meta';
     refreshSelection = () => {
       buttonUpdates.forEach(update => update());
+      const preview=selected.response;
+      const html=preview&&(preview.html||CTFBody.isHTML(preview.contentType||'',preview.body));
+      responseNote.textContent = !preview ? t('Chưa có body. Reload & ghi để thu Fetch/XHR mới.') : html ? t('Đã bỏ qua body HTML.') : preview.truncated ? t('Body đã được cắt ngắn.') : '';
+      responseBody.hidden = !preview || html;
+      responseBody.textContent = preview && !html ? CTFBody.format(preview.body,preview.contentType) : '';
       const kind = ({ xmlhttprequest: 'FETCH/XHR', main_frame: 'DOCUMENT', sub_frame: 'IFRAME', stylesheet: 'CSS', websocket: 'WS' })[selected.type] || (selected.type || 'request').toUpperCase();
       meta.textContent = [kind, selected.contentType || '', `${entry.count}×`, entry.variants?.length > 1 ? t('{count} biến thể · bung để chọn', { count: entry.variants.length }) : '', Number.isFinite(selected.duration) ? `${Math.round(selected.duration)} ms` : '', selected.fromCache ? 'cache' : '', selected.frameId > 0 ? `frame ${selected.frameId}` : '', selected.tabId === -1 ? t('SW/nền') : '', selected.headersKnown === false ? t('thiếu headers') : '', selected.body?.approximate ? 'body ≈' : '', selected.body?.truncated || selected.body?.missing ? t('thiếu body') : ''].filter(Boolean).join(' · ');
       meta.title = meta.textContent;

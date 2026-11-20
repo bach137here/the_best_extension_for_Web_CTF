@@ -1,6 +1,10 @@
 (() => {
   if (globalThis.CTFI18N) return;
   const english = {
+    'Body phản hồi': 'Response body',
+    'Chưa có body. Reload & ghi để thu Fetch/XHR mới.': 'Body unavailable. Reload & capture new Fetch/XHR requests.',
+    'Đã bỏ qua body HTML.': 'HTML body skipped.',
+    'Body đã được cắt ngắn.': 'Body preview was truncated.',
     'Chỉ nhận nội dung không phải HTML.': 'Non-HTML responses only.',
     'Không hiển thị response HTML. Chỉ hỗ trợ nội dung không phải HTML.': 'HTML response skipped. Only non-HTML content is supported.',
     'Fetch dùng cookie của trình duyệt; không thể đặt nguyên bản các header bị trình duyệt kiểm soát.': 'Fetch uses browser cookies; browser-controlled headers cannot be reproduced verbatim.',

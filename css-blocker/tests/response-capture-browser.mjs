@@ -1,0 +1,25 @@
+import {readFile} from 'node:fs/promises';import assert from 'node:assert/strict';
+const {origin}=JSON.parse(await readFile(new URL('./demo-context.json',import.meta.url)));
+const task=await taskSpace('CTF simple verification'),page=task.page('p1');
+console.log({spaceId:task.spaceId});
+await page.goto(origin+'/capture-demo');await page.waitForFunction(()=>window.__captureReady===true);
+await page.evaluate(async()=>{
+  const request=new Request('/__echo?request-object',{method:'POST',body:'request-object'});
+  const response=await fetch(request);const echo=await response.json();if(echo.body!=='request-object')throw new Error('Original Request consumed');
+  await Promise.all(['first','second'].map(body=>new Promise((resolve,reject)=>{const xhr=new XMLHttpRequest();xhr.open('POST','/__echo?xhr');xhr.responseType='json';xhr.onload=()=>xhr.response.body===body?resolve():reject(new Error('XHR body changed'));xhr.onerror=reject;xhr.send(body);}))); 
+  const html=await(await fetch('/__html')).text();if(!html.includes('HTML demo response'))throw new Error('HTML page response was altered');
+});
+await page.waitForFunction(()=>window.__packets.length>=4);
+const packets=await page.evaluate(()=>window.__packets);
+assert.ok(packets.some(packet=>packet.url.includes('request-object')&&JSON.parse(packet.body).body==='request-object'));
+for(const body of ['first','second'])assert.ok(packets.some(packet=>packet.url.includes('?xhr')&&JSON.parse(packet.body).body===body));
+assert.ok(packets.some(packet=>packet.url.includes('/__html')&&packet.html&&packet.body===''));
+await page.evaluate(async()=>{await new Promise(resolve=>{const done=event=>{if(event.data?.channel==='ctf-simple.capture-control'&&!event.data.enabled){window.removeEventListener('message',done);resolve();}};window.addEventListener('message',done);window.postMessage({channel:'ctf-simple.capture-control',enabled:false},location.origin);});await(await fetch('/__echo?paused')).text();});
+assert.equal(await page.evaluate(()=>window.__packets.some(packet=>packet.url.includes('?paused'))),false);
+await page.evaluate(await readFile(new URL('../body-format.js',import.meta.url),'utf8'));
+const formatted=await page.evaluate(()=>({json:CTFBody.format('{"user":{"name":"demo"},"ok":true}'),xml:CTFBody.format('<root><item><value>1</value></item></root>','application/xml'),mixed:CTFBody.format('<p>Hello <b>world</b>!</p>','application/xml'),cdata:CTFBody.format('<root><![CDATA[<div>data</div>]]><x/></root>','application/xml'),invalid:CTFBody.format('<root><x></root>','application/xml'),preserve:CTFBody.format('<root xml:space="preserve"><x> a </x><y/></root>','application/xml')}));
+assert.ok(formatted.json.includes('\n  "user": {\n    "name": "demo"'));
+assert.ok(formatted.xml.includes('\n  <item>\n    <value>1</value>\n  </item>'));
+assert.equal(formatted.mixed,'<p>Hello <b>world</b>!</p>');assert.ok(formatted.cdata.includes('<![CDATA[<div>data</div>]]><x/>'));
+assert.equal(formatted.invalid,'<root><x></root>');assert.ok(formatted.preserve.includes('<x> a </x><y/>'));
+console.log('PASS: real Fetch/Request and XHR responses captured without consuming app bodies, HTML omitted, capture-off respected, JSON/XML beautified with mixed content and CDATA preserved.');

@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 const context=vm.createContext({URL,TextEncoder,TextDecoder,fetch,AbortController,setTimeout,clearTimeout,btoa});
+vm.runInContext(await readFile(new URL('../body-format.js',import.meta.url),'utf8'),context);
 vm.runInContext(await readFile(new URL('../replay.js',import.meta.url),'utf8'),context);
 const parse=context.CTFReplay.parse;
 const raw='POST /login?q=%252F HTTP/1.1\r\nHost: example.test\r\nContent-Type: application/json\r\nCookie: session=demo\r\nAuthorization: Bearer demo\r\nX-CSRF-Token: token\r\nSec-Fetch-Site: same-origin\r\nContent-Length: 999\r\n\r\n{"name":"guest"}\r\n';

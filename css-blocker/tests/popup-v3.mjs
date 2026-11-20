@@ -36,6 +36,7 @@ const context = vm.createContext({
     } }
   }
 });
+vm.runInContext(await readFile(new URL('../body-format.js', import.meta.url), 'utf8'), context);
 vm.runInContext(await readFile(new URL('../network.js', import.meta.url), 'utf8'), context);
 vm.runInContext(await readFile(new URL('../policy.js', import.meta.url), 'utf8'), context);
 vm.runInContext(await readFile(new URL('../popup.js', import.meta.url), 'utf8'), context);

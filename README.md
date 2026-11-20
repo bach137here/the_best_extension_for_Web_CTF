@@ -2,7 +2,7 @@
 
 <h1 align="center">CTF Simple</h1>
 <p align="center"><strong>Less wallpaper. More flags.</strong><br>A small Chrome / Edge extension for getting straight to the useful parts of a web challenge.</p>
-<p align="center">Vanilla JavaScript · No build step · VI / EN interface · MIT · v3.3.1</p>
+<p align="center">Vanilla JavaScript · No build step · VI / EN interface · MIT · v3.4.0</p>
 
 Remove the CSS. Spot a suspicious `.view-source`. Unmask an input. Copy a request. Keep solving.
 
@@ -39,7 +39,7 @@ Open `http://localhost:8000/docs/demo.html`, enable Zen in the extension, and tr
 
 ### 2. Peel away the styling
 
-Click **Block CSS strongly**. Styles disappear and stay blocked after a refresh. **Restore CSS** clears that hostname's saved choice and reloads the page.
+Click **Block CSS strongly**. Styles disappear and stay blocked after a refresh. Existing image and icon dimensions are preserved; oversized media is capped so it stays usable without CSS. **Restore CSS** clears that hostname's saved choice and reloads the page.
 
 The CSS panel lists **class and ID names**, with a simple group selector: CTF keywords, not currently matched in the DOM, hidden content, or all names. No search box, no wall of stylesheet text.
 
@@ -53,7 +53,7 @@ Those are examples worth a second look, not proof of a vulnerability. Unmatched 
 
 ### 3. Follow the requests
 
-Click **Reload & capture** to record a fresh page load. CSS, scripts, images, fonts, media, and embedded objects loaded as static resources are skipped. Documents, form submissions, Fetch/XHR, and other application requests remain. Rows stay compact: `GET /admin`, not a repeated hostname. Click **▾** next to a path to reveal the entire path and query on multiple lines.
+Click **Reload & capture** to record a fresh page load. CSS, scripts, images, fonts, media, and embedded objects loaded as static resources are skipped. Documents, form submissions, Fetch/XHR, and other application requests remain. Rows stay compact: `GET /admin`, not a repeated hostname. Click **▾** next to a path to reveal the entire path and query on multiple lines, plus its non-HTML response body when available. JSON and XML previews are automatically beautified.
 
 Combine **method**, **resource type**, **MIME type**, **status** (`403`, `4xx`, `error`), and **path search** filters. Only requests to the current exact hostname appear.
 
@@ -83,7 +83,7 @@ Content-Type: application/json
 {"username":"guest","password":"demo"}
 ```
 
-Raw Fetch only previews **non-HTML responses** such as JSON, text, and XML. HTML/XHTML MIME types are rejected, and common HTML markup is detected when a server labels it incorrectly. The request is sent first; this filters its response, not its server-side effects. Binary data is displayed as base64. Previews have a 30-second timeout and a 2 MiB limit; use **Stop** to cancel a pending request.
+Raw Fetch only previews **non-HTML responses** such as JSON, text, and XML. JSON and XML bodies are automatically beautified; ordinary text is preserved. HTML/XHTML MIME types are rejected, and common HTML markup is detected when a server labels it incorrectly. The request is sent first; this filters its response, not its server-side effects. Binary data is displayed as base64. Previews have a 30-second timeout and a 2 MiB limit; use **Stop** to cancel a pending request.
 
 Raw Fetch uses the browser's `fetch` API and cookie jar. You cannot manually reproduce browser-controlled headers such as Cookie, Host, Origin, or Sec-*; omitted names are listed below the response. GET/HEAD bodies and unsupported methods are rejected. Use cURL when you need closer control of the wire request. Responses are not saved when the popup closes.
 
@@ -127,7 +127,7 @@ The field keeps spaces, Unicode, and existing percent escapes without encoding o
 ## A few honest limits
 
 - This is a page-inspection helper. Form edits do not bypass server or JavaScript validation; Zen is a DOM heuristic and can keep or hide unexpected content.
-- Capture uses Chrome's `webRequest` events: documents, Fetch/XHR, other application requests, failures, and exposed WebSocket handshakes. Static browser resource types are skipped; a Fetch/XHR call is retained even if its URL looks like an asset. It does **not** read response bodies or WebSocket messages. Memory-cache hits, browser-internal traffic, and requests before startup may be missing.
+- Capture uses Chrome's `webRequest` events for request metadata. Static browser resource types are skipped; a Fetch/XHR call is retained even if its URL looks like an asset. A separate page hook previews new Fetch/XHR response bodies (up to 64 KiB), excluding HTML, without replaying the request. Reload & capture after installing to collect new bodies. Older history, workers, opaque responses, and calls missed by the page hook can have no body. WebSocket messages, browser-internal traffic, and some cached requests are unavailable.
 - Same-hostname filtering excludes other subdomains and CDNs. Tabless worker traffic needs a matching initiator origin; if an endpoint on that hostname is excluded, that hostname's tabless traffic is omitted because Chrome cannot reliably attribute it to an endpoint.
 - **≈** means a reconstructed form body. Incomplete or oversized bodies are not exported as complete requests. WebSocket handshakes cannot be exported for HTTP replay. Raw exports are reconstructed text, not original HTTP/2/3 bytes.
 - No analytics or external log service. Logs stay in local session storage: up to 1,000 groups or roughly 3 million characters across tabs. Exported headers may contain credentials; inspect copies before sharing. Persistent preferences use local storage.
@@ -156,6 +156,8 @@ node css-blocker/tests/i18n.mjs
 node css-blocker/tests/policy.mjs
 node css-blocker/tests/scope.mjs
 node css-blocker/tests/replay.mjs
+node css-blocker/tests/body-format.mjs
+node css-blocker/tests/network-tap.mjs
 ```
 
 On Windows, `node css-blocker/tests/curl-cmd.mjs` checks CMD exports against a local server. Browser fixtures use `tests/demo-server.mjs` and Ego Browser. These use simulated Chrome APIs; load the unpacked extension in Chrome/Edge for integration checks.

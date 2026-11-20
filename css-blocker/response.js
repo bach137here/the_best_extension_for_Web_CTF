@@ -14,7 +14,7 @@
       const result = await CTFReplay.send(stored.job.raw,stored.job.protocol,controller.signal);
       $('#target').textContent = `${result.method} ${result.url}`;
       $('#responseHeaders').textContent = result.headers.map(([name,value])=>`${name}: ${value}`).join('\n');
-      $('#responseBody').textContent = result.body;
+      $('#responseBody').textContent = CTFBody.format(result.body,result.contentType);
       $('#notice').textContent = [result.html ? t('Không hiển thị response HTML. Chỉ hỗ trợ nội dung không phải HTML.') : '',result.skipped.length ? t('Header do trình duyệt kiểm soát, không gửi nguyên bản: {headers}',{headers:result.skipped.join(', ')}) : '',result.truncated ? t('Chỉ hiển thị 2 MiB đầu của response.') : ''].filter(Boolean).join(' ');
       $('#summary').textContent = `${result.status} ${result.statusText} · ${result.ms} ms · ${result.bytes} B`;
       $('#summary').className = result.ok && !result.html ? '' : 'error';

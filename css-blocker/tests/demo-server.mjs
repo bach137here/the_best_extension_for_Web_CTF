@@ -2,7 +2,7 @@
 import { createServer } from 'node:http';
 import { readFile, writeFile } from 'node:fs/promises';
 const root = new URL('../', import.meta.url);
-const files = new Set(['popup.css', 'popup.js', 'policy.js', 'i18n.js', 'scope.js', 'network.js', 'dom-guard.js', 'page.js', 'content.js', 'hints.js', 'replay.js', 'request.js', 'response.js', 'response.css']);
+const files = new Set(['popup.css', 'popup.js', 'policy.js', 'i18n.js', 'scope.js', 'network.js', 'dom-guard.js', 'page.js', 'content.js', 'hints.js', 'replay.js', 'request.js', 'response.js', 'response.css', 'body-format.js','network-tap.js','response-bridge.js']);
 function mockChrome(language, pageDemo = false) {
   return `(() => {
     const defaults = { language: ${JSON.stringify(language)}, disabledSites: [], disabledEndpoints: [], prefs: { passwords: true, reveal: true, unlock: true, textInputs: true, copy: true, urlBar: ${pageDemo} } };
@@ -17,7 +17,8 @@ function mockChrome(language, pageDemo = false) {
       { method: 'GET', path: '/api/profile', status: 200, type: 'xmlhttprequest', contentType: 'application/json', count: 2, duration: 18 },
       { method: 'GET', path: '/flag', status: 404, type: 'xmlhttprequest', contentType: 'text/plain', count: 1, duration: 9 },
       { method: 'GET', path: '/assets/app.js', status: 304, type: 'script', contentType: 'application/javascript', count: 1, duration: 5, fromCache: true }
-    ].map((entry, index) => ({ ...entry, tabId: 7, url: 'https://demo.ctf' + entry.path, headersKnown: true, headers: [{ name: 'Accept', value: 'application/json' }], time: index }));
+    ].map((entry, index) => ({ ...entry, tabId: 7, url: 'https://demo.ctf' + entry.path, headersKnown: true, headers: [{ name: 'Accept', value: 'application/json' }], time: index,
+      ...(entry.path === '/api/login' ? {response:{contentType:'application/json',body:JSON.stringify({authenticated:true,role:'guest'})}} : entry.path === '/api/profile' ? {response:{contentType:'application/json',body:JSON.stringify({username:'demo',role:'guest'})}} : {}) }));
     window.chrome = {
       storage: { session: {
         get: async key => ({ [key]: JSON.parse(localStorage.getItem('ctf-demo-session') || '{}')[key] }),
@@ -49,6 +50,10 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname === '/__stop') { res.end('stopped'); server.close(); return; }
+    if (url.pathname === '/capture-demo') {
+      res.setHeader('Content-Type','text/html; charset=utf-8');
+      res.end(`<!doctype html><meta charset="utf-8"><title>Response capture fixture</title><script>${mockChrome('en')}window.CTFScope={disabled:false,ready:Promise.resolve()};window.__packets=[];chrome.runtime.sendMessage=async message=>{if(message.type==='responseBody')window.__packets.push(message.packet);return {ok:true}};window.addEventListener('message',event=>{if(event.data?.channel==='ctf-simple.capture-control'&&event.data.enabled)window.__captureReady=true;});</script><script src="/body-format.js"></script><script src="/network-tap.js"></script><script src="/response-bridge.js"></script><p>Native Fetch/XHR response capture fixture.</p>`); return;
+    }
     if (url.pathname === '/__echo') {
       const chunks = []; for await (const chunk of req) chunks.push(chunk);
       res.statusCode = url.searchParams.get('status') === '403' ? 403 : 200;

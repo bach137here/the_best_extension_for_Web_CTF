@@ -35,20 +35,7 @@ globalThis.CTFReplay = (() => {
     if (!['https:','http:'].includes(url.protocol) || url.username || url.password) throw fail('Chỉ hỗ trợ HTTP/HTTPS.');
     return { url: url.href, method, headers, body: ['GET','HEAD'].includes(upper) ? undefined : new TextEncoder().encode(body), skipped: [...new Set(skipped)] };
   }
-  function isHTML(contentType, text = '') {
-    const mime = contentType.split(';')[0].trim().toLowerCase();
-    if (mime === 'text/html' || mime === 'application/xhtml+xml' || mime.endsWith('+html')) return true;
-    let offset = 0;
-    while (offset < text.length) {
-      while (offset < text.length && /\s/.test(text[offset])) offset++;
-      if (text.startsWith('<!--',offset)) { const end = text.indexOf('-->',offset+4); if (end < 0) return true; offset = end+3; }
-      else if (/^<\?xml\b/i.test(text.slice(offset,offset+8))) { const end = text.indexOf('?>',offset+5); if (end < 0) return true; offset = end+2; }
-      else break;
-    }
-    const prefix = text.slice(offset,offset+256);
-    if (mime === 'application/xml' || mime === 'text/xml' || mime.endsWith('+xml')) return /^<(?:!doctype\s+html|html)\b/i.test(prefix);
-    return /^<(?:!doctype\s+html|html|head|body|title|meta|link|script|style|div|span|p|h[1-6]|form|input|button|table|ul|ol|li|a|img|iframe|section|main|header|footer|article|nav|aside|textarea|select|option|label|pre|code)\b/i.test(prefix);
-  }
+  const isHTML = (type,text) => CTFBody.isHTML(type,text);
   async function send(raw, protocol, signal) {
     const request = parse(raw, protocol), controller = new AbortController();
     let timedOut = false;
@@ -58,7 +45,7 @@ globalThis.CTFReplay = (() => {
     try {
       const response = await fetch(request.url, { method:request.method, headers:request.headers, body:request.body, credentials:'include', redirect:'follow', signal:controller.signal });
       const type = response.headers.get('content-type') || '';
-      const result = { status:response.status, statusText:response.statusText, ok:response.ok, url:response.url || request.url, method:request.method, headers:[...response.headers], skipped:request.skipped, bytes:0, body:'', html:false, truncated:false };
+      const result = { status:response.status, statusText:response.statusText, ok:response.ok, url:response.url || request.url, method:request.method, contentType:type, headers:[...response.headers], skipped:request.skipped, bytes:0, body:'', html:false, truncated:false };
       if (isHTML(type)) { await response.body?.cancel(); return { ...result, html:true, ms:Date.now()-start }; }
       const chunks = [];
       if (response.body) {
@@ -71,15 +58,7 @@ globalThis.CTFReplay = (() => {
       }
       const bytes = new Uint8Array(result.bytes); let offset = 0;
       for (const chunk of chunks) { bytes.set(chunk,offset); offset += chunk.length; }
-      const charset = /charset\s*=\s*["']?([^\s;"']+)/i.exec(type)?.[1] || 'utf-8';
-      let decoder; try { decoder = new TextDecoder(charset,{fatal:true}); } catch { decoder = new TextDecoder('utf-8',{fatal:true}); }
-      let text, binary = false;
-      try { text = decoder.decode(bytes); } catch { binary = true; text = new TextDecoder().decode(bytes.subarray(0,8192)); }
-      result.html = isHTML(type,text);
-      const mime = type.split(';')[0].trim().toLowerCase();
-      const textual = mime.startsWith('text/') || ['application/json','application/xml','application/javascript','application/ecmascript','application/x-www-form-urlencoded','application/graphql','application/yaml','application/x-yaml'].includes(mime) || mime.endsWith('+json') || mime.endsWith('+xml');
-      if (!result.html) result.body = binary || text.includes('\0') || (mime && !textual) ? '[base64]\n' + btoa(Array.from(bytes,byte=>String.fromCharCode(byte)).join('')) : text;
-      return { ...result, ms:Date.now()-start };
+      return { ...result, ...CTFBody.preview(bytes,type), ms:Date.now()-start };
     } catch (error) { if (timedOut) throw fail('Hết thời gian chờ (30 giây).'); throw error; }
     finally { clearTimeout(timer); signal?.removeEventListener('abort',abort); }
   }

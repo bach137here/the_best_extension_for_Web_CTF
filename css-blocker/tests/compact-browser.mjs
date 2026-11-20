@@ -8,8 +8,8 @@ await page.goto(origin+'/popup?lang=en');await page.waitForFunction(()=>!documen
 await page.evaluate(async()=>{
   const original=chrome.runtime.sendMessage, initial=(await original({type:'requests'})).entries;
   window.__entries=[...initial,
-    {method:'POST',url:'https://demo.ctf/api/login?q=guest',tabId:7,type:'xmlhttprequest',contentType:'application/json',status:401,count:1,time:90,body:{text:'{"username":"guest"}'}},
-    {method:'POST',url:'https://demo.ctf/api/login?q=admin',tabId:7,type:'xmlhttprequest',contentType:'application/json',status:200,count:1,time:100,body:{text:'{"username":"admin"}'}}
+    {method:'POST',url:'https://demo.ctf/api/login?q=guest',tabId:7,type:'xmlhttprequest',contentType:'application/json',status:401,count:1,time:90,body:{text:'{"username":"guest"}'},response:{body:'{"role":"guest","authenticated":false}',contentType:'application/json'}},
+    {method:'POST',url:'https://demo.ctf/api/login?q=admin',tabId:7,type:'xmlhttprequest',contentType:'application/json',status:200,count:1,time:100,body:{text:'{"username":"admin"}'},response:{body:'{"role":"admin","authenticated":true}',contentType:'application/json'}}
   ].map(entry=>({...entry,headers:[{name:'Content-Type',value:'application/json'},{name:'Authorization',value:'Bearer demo'},{name:'User-Agent',value:'demo-browser'},{name:'Sec-Fetch-Site',value:'same-origin'}]}));
   chrome.runtime.sendMessage=async message=>message.type==='requests'?{entries:window.__entries}:original(message);
   Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>{window.__copied=text;}}});
@@ -21,7 +21,9 @@ assert.ok(await page.evaluate(()=>window.__copied.includes('admin')&&!window.__c
 await page.selectOption('#exportHeaders','full');await page.click('.request:first-child [data-format=raw]');
 assert.ok(await page.evaluate(()=>window.__copied.includes('User-Agent')&&window.__copied.endsWith('{"username":"admin"}')));
 await page.click('.request:first-child .expand-url');
+assert.equal(await page.evaluate(()=>document.querySelector('.request:first-child .response-body').textContent),'{\n  "role": "admin",\n  "authenticated": true\n}');
 await page.selectOption('.request:first-child .url-detail select','1');await page.click('.request:first-child [data-format=raw]');
+assert.equal(await page.evaluate(()=>document.querySelector('.request:first-child .response-body').textContent),'{\n  "role": "guest",\n  "authenticated": false\n}');
 assert.ok(await page.evaluate(()=>window.__copied.endsWith('{"username":"guest"}')&&window.__copied.includes('q=guest')));
 await page.click('#refresh');await page.click('.request:first-child [data-format=raw]');
 assert.ok(await page.evaluate(()=>window.__copied.endsWith('{"username":"guest"}')));
@@ -47,6 +49,7 @@ await page.click('#send');
 await page.waitForFunction(()=>/^403/.test(document.querySelector('#rawSummary')?.textContent||'')&&!document.querySelector('#rawResult').hidden);
 assert.equal((await task.pages()).length,before,'Sending must show the response inline without a new tab');
 const echo=JSON.parse(await page.evaluate(()=>document.querySelector('#rawBody').textContent));
+assert.ok(await page.evaluate(()=>document.querySelector('#rawBody').textContent.includes('\n  "method": "POST"')),'Raw Fetch must beautify JSON');
 assert.equal(echo.body,'line 1\nline 2','Browser textarea normalizes CRLF to LF, as documented');assert.equal(echo.check,'demo');assert.equal(echo.method,'POST');
 assert.ok(await page.evaluate(()=>document.querySelector('#rawNotice').textContent.includes('Cookie')));
 await print(page,'fetch-response');

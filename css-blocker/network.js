@@ -47,7 +47,10 @@ globalThis.CTFNetwork = (() => {
     const old = index >= 0 ? entries.splice(index, 1)[0] : undefined;
     const sameLifecycle = request.rid && old?.rid === request.rid;
     entries.push({ ...request, count: (old?.count || 0) + (sameLifecycle ? 0 : 1), firstTime: old?.firstTime || request.time });
-    // Keep session memory bounded across tabs, including large request payloads.
+    return trim(entries);
+  }
+  function trim(entries) {
+    // Keep session memory bounded across tabs, including response previews.
     while (entries.length > 1000 || (entries.length > 1 && JSON.stringify(entries).length > 3000000)) entries.shift();
     return entries;
   }
@@ -115,5 +118,5 @@ globalThis.CTFNetwork = (() => {
     const note = (request.headersKnown === false ? 'REM Chrome khong cung cap headers goc; day la request tai dung.\r\n' : '') + (request.body?.approximate ? 'REM Body form tai dung; encoding/thu tu goc co the khac.\r\n' : '');
     return note + command;
   }
-  return { body, identity, upsert, curl, curlCmd, raw, isStatic, groupEndpoints };
+  return { body, identity, upsert, curl, curlCmd, raw, isStatic, groupEndpoints, trim };
 })();

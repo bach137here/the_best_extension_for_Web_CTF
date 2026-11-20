@@ -17,7 +17,7 @@
       $('#rawSummary').className = result.ok && !result.html ? '' : 'error';
       $('#rawTarget').textContent = `${result.method} ${result.url}`;
       $('#rawHeaders').textContent = result.headers.map(([name,value])=>`${name}: ${value}`).join('\n');
-      $('#rawBody').textContent = result.body;
+      $('#rawBody').textContent = CTFBody.format(result.body,result.contentType);
       $('#rawBody').hidden = result.html;
       $('#rawNotice').textContent = [result.html ? t('Không hiển thị response HTML. Chỉ hỗ trợ nội dung không phải HTML.') : '', result.skipped.length ? t('Header do trình duyệt kiểm soát, không gửi nguyên bản: {headers}', {headers:result.skipped.join(', ')}) : '', result.truncated ? t('Chỉ hiển thị 2 MiB đầu của response.') : ''].filter(Boolean).join(' ');
       $('#rawError').textContent = ''; $('#rawResult').hidden = false;

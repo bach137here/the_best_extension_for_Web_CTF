@@ -3,13 +3,58 @@
   let active = false;
   const roots = new Set();
   const ownedStyles = new WeakSet();
+  const sizedMedia = new WeakSet();
+  const safetyStyles = new WeakMap();
+  // Canvas dimension attributes reset its bitmap, so only cap it with CSS.
+  const mediaSelector = 'img, svg, video';
   const observer = new MutationObserver(records => {
     if (!active) return;
+    // Measure the whole batch before removing any styles that affect its media.
+    for (const record of records) {
+      if (record.type === 'attributes') preserveMedia(record.target);
+      else for (const node of record.addedNodes) preserveMedia(node);
+    }
     for (const record of records) {
       if (record.type === 'attributes') clean(record.target);
       else for (const node of record.addedNodes) scan(node);
     }
+    for (const root of roots) ensureSafetyStyle(root);
   });
+
+  function preserveMedia(node) {
+    if (node.nodeType === 1) {
+      if (node.matches(mediaSelector) && !sizedMedia.has(node) &&
+          !(node.localName === 'svg' && node.parentElement?.closest('svg'))) {
+        const { width, height } = node.getBoundingClientRect();
+        if (width > 0 && height > 0) {
+          node.setAttribute('width', Math.max(1, Math.round(width)));
+          node.setAttribute('height', Math.max(1, Math.round(height)));
+          sizedMedia.add(node);
+        }
+      }
+      if (node.shadowRoot) preserveMedia(node.shadowRoot);
+    }
+    if (node.children) for (const child of node.children) preserveMedia(child);
+  }
+
+  function ensureSafetyStyle(root) {
+    if (safetyStyles.get(root)?.isConnected) return;
+    const parent = root === document ? document.head || document.documentElement : root;
+    if (!parent) return; // document_start can run before <html> exists.
+    const style = document.createElement('style');
+    style.textContent = `
+      :is(img, svg, video, canvas):not(svg svg) {
+        max-width: min(100%, 640px) !important;
+        max-height: 360px !important;
+        object-fit: contain !important;
+      }
+      :where(:is(img, svg, video, canvas):not(svg svg):not([height])) { height: auto; }
+      :where(svg:not(svg svg):not([width]):not([height])) { width: 32px; height: 32px; }
+    `;
+    ownedStyles.add(style);
+    safetyStyles.set(root, style);
+    parent.append(style);
+  }
 
   function clean(element) {
     if (element.nodeType !== 1) return;
@@ -31,12 +76,14 @@
 
   function watch(root) {
     if (!roots.has(root)) {
+      preserveMedia(root);
       roots.add(root);
       observer.observe(root, { subtree: true, childList: true, attributes: true,
         attributeFilter: ['style', 'rel'] });
       scan(root);
     }
     if (root.adoptedStyleSheets?.length) root.adoptedStyleSheets = [];
+    ensureSafetyStyle(root);
   }
 
   globalThis.CSSBlocker = {

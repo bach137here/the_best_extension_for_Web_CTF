@@ -1,4 +1,4 @@
-importScripts('policy.js', 'i18n.js', 'network.js');
+importScripts('policy.js', 'i18n.js', 'body-format.js', 'network.js');
 const filter = { urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] };
 const tabURLs = new Map();
 const requestPages = new Map();
@@ -6,7 +6,9 @@ function pageAtEvent(details) {
   const key = JSON.stringify([details.tabId, details.requestId, details.url]);
   if (!requestPages.has(key)) {
     const page = details.tabId < 0 ? details.initiator : tabURLs.get(details.tabId) || chrome.tabs.get(details.tabId).then(tab => tab.url).catch(() => null);
-    requestPages.set(key, { tabId: details.tabId, page, policy: settingsLoaded ? { ...settings } : settingsReady.then(() => ({ ...settings })) });
+    const payload = CTFNetwork.body(details.requestBody);
+    const tag = !payload ? 'none' : payload.missing || payload.truncated ? null : payload.text !== undefined ? CTFBody.tag('text',payload.text) : payload.base64 !== undefined ? CTFBody.tag('base64',payload.base64) : null;
+    requestPages.set(key, { tabId: details.tabId, page, policy: settingsLoaded ? { ...settings } : settingsReady.then(() => ({ ...settings })), request:{tabId:details.tabId,rid:details.requestId,url:details.url,method:details.method||'GET',type:details.type,frameId:details.frameId||0,time:details.timeStamp,tag} });
     if (requestPages.size > 3000) requestPages.delete(requestPages.keys().next().value);
   }
   return requestPages.get(key);
@@ -40,6 +42,31 @@ async function allowedContext(details, capturedPage) {
 }
 let queue = Promise.resolve();
 let captureWarning = '';
+const pendingResponses = [];
+async function attachResponse(entries, item) {
+  const {packet,tabId,frameId}=item;
+  let candidates=[...requestPages.values()].filter(context=>{const req=context.request;return req.tabId===tabId&&req.frameId===frameId&&req.url===packet.url&&req.method===packet.method&&req.type==='xmlhttprequest'&&Number.isFinite(req.time)&&Math.abs(req.time-packet.started)<1000;});
+  if(packet.tags)candidates=candidates.filter(context=>context.request.tag&&packet.tags.includes(context.request.tag));
+  candidates.sort((a,b)=>Math.abs(a.request.time-packet.started)-Math.abs(b.request.time-packet.started));
+  if(!candidates.length)return false;
+  if((!packet.tags&&candidates.length>1)||(candidates[1]&&Math.abs(Math.abs(candidates[0].request.time-packet.started)-Math.abs(candidates[1].request.time-packet.started))<2))return true;
+  const context=candidates[0];
+  if(context.responseSeen)return true;
+  const finalContext=requestPages.get(JSON.stringify([tabId,context.request.rid,packet.finalUrl]));
+  if(packet.finalUrl!==packet.url&&!finalContext)return false;
+  if(!await allowedContext(context.request,context)||CTFPolicy.isDisabled(packet.finalUrl,settings)||CTFPolicy.isDisabled(packet.finalUrl,await context.policy)||(finalContext&&!await allowedContext(finalContext.request,finalContext)))return true;
+  const entry=entries.find(entry=>entry.tabId===tabId&&entry.rid===context.request.rid&&entry.url===packet.finalUrl);
+  if(!entry)return true;
+  const html=packet.html||CTFBody.isHTML(packet.contentType,packet.body);
+  entry.response={body:html?'':packet.body,html,contentType:packet.contentType,truncated:packet.truncated,status:packet.status};
+  context.responseSeen=true;
+  if(finalContext)finalContext.responseSeen=true;
+  return true;
+}
+async function attachPending(entries){
+  for(let index=pendingResponses.length-1;index>=0;index--){const item=pendingResponses[index];if(Date.now()-item.received>10000||await attachResponse(entries,item))pendingResponses.splice(index,1);}
+  return entries;
+}
 function serialized(task) {
   const result = queue.then(task);
   queue = result.catch(error => { captureWarning = error.message; console.warn('CTF requests:', error.message); });
@@ -61,7 +88,8 @@ chrome.webRequest.onBeforeRequest.addListener(details => {
   serialized(async () => {
     const pageUrl = await allowedContext(details, capturedPage); if (!pageUrl) return;
     const request = { ...snapshot(details), pageUrl, body: CTFNetwork.body(details.requestBody) };
-    await chrome.storage.session.set({ requests: CTFNetwork.upsert(await read(), request) });
+    const entries=CTFNetwork.upsert(await read(), request);await attachPending(entries);
+    await chrome.storage.session.set({ requests: CTFNetwork.trim(entries) });
   });
 }, filter, ['requestBody', 'extraHeaders']);
 chrome.webRequest.onBeforeSendHeaders.addListener(details => {
@@ -79,7 +107,8 @@ chrome.webRequest.onBeforeSendHeaders.addListener(details => {
       entry = entries[entries.length - 1];
     }
     entry.headers = details.requestHeaders || []; entry.headersKnown = true;
-    await chrome.storage.session.set({ requests: entries });
+    await attachPending(entries);
+    await chrome.storage.session.set({ requests: CTFNetwork.trim(entries) });
   });
 }, filter, ['requestHeaders', 'extraHeaders']);
 function finish(details) {
@@ -119,6 +148,18 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.contentSettings.javascript.clear({ scope: 'regular' }).catch(() => {});
 });
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if(message?.type==='responseBody'){
+    const packet=message.packet,tabId=sender.tab?.id,frameId=sender.frameId||0;
+    if(!Number.isInteger(tabId)||tabId<0||(!/^https?:\/\//.test(sender.url||'')&&!/^https?:\/\//.test(sender.origin||''))||!packet||typeof packet.body!=='string'||packet.body.length>100000||typeof packet.contentType!=='string'||packet.contentType.length>256||typeof packet.method!=='string'||packet.method.length>32||!Number.isFinite(packet.started)||typeof packet.html!=='boolean'||typeof packet.truncated!=='boolean'||!Number.isInteger(packet.status)||(packet.tags!==null&&(!Array.isArray(packet.tags)||packet.tags.length>3||packet.tags.some(tag=>typeof tag!=='string'||tag.length>128))))return;
+    try{for(const value of [packet.url,packet.finalUrl]){if(typeof value!=='string'||value.length>16384||!['http:','https:'].includes(new URL(value).protocol))return;}}catch{return;}
+    serialized(async()=>{
+      const html=packet.html||CTFBody.isHTML(packet.contentType,packet.body);
+      const entries=await read(),item={packet:{...packet,html,body:html?'':packet.body},tabId,frameId,received:Date.now()};
+      if(!await attachResponse(entries,item)){pendingResponses.push(item);if(pendingResponses.length>32)pendingResponses.shift();}
+      await chrome.storage.session.set({requests:CTFNetwork.trim(entries)});
+    }).then(()=>sendResponse({ok:true}),error=>sendResponse({error:error.message}));
+    return true;
+  }
   if (message?.type === 'takeReplay') {
     if (sender.url?.split('#')[0] !== chrome.runtime.getURL('response.html') || !/^replay:[a-zA-Z0-9-]+$/.test(message.key || '')) return;
     serialized(async () => {

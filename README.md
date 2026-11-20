@@ -2,7 +2,7 @@
 
 <h1 align="center">CTF Simple</h1>
 <p align="center"><strong>Less wallpaper. More flags.</strong><br>A small Chrome / Edge extension for getting straight to the useful parts of a web challenge.</p>
-<p align="center">Vanilla JavaScript · No build step · VI / EN interface · MIT · v3.4.0</p>
+<p align="center">Vanilla JavaScript · No build step · VI / EN interface · MIT · v3.4.1</p>
 
 Remove the CSS. Spot a suspicious `.view-source`. Unmask an input. Copy a request. Keep solving.
 
@@ -24,6 +24,8 @@ Chrome 119+ or compatible Edge. No account, npm install, or build required. To u
 Meet **Packet Picnic**, our deliberately cluttered [demo page](docs/demo.html). Announcements, navigation, sidebars, and sponsor copy all compete with one small form.
 
 **Switch on Zen mode.** The same page keeps its form and response. The unrelated static content disappears. Switch Zen off to bring it back.
+
+Zen hides elements without replacing the page's text nodes, so live UI updates keep their original DOM references. Bare text sharing a container with a form may remain visible. Version 3.4.1 also fixes an observer loop when closing the Zen toolbar while CSS blocking is enabled.
 
 | Before Zen | After Zen |
 | --- | --- |
@@ -99,7 +101,7 @@ The editor sends UTF-8 text and normalizes pasted line endings to LF. Transfer-e
 | --- | --- |
 | Show passwords | Password inputs become readable. |
 | Show hidden content | Hidden page fields and content become visible. |
-| Remove form restrictions | Removes HTML constraints such as `required`, `readonly`, `disabled`, length limits, and patterns. |
+| Remove form restrictions | On by default. Removes `required`, `pattern`, `readonly`, `disabled`, `min`, `max`, `minlength`, `maxlength`, `step`, and `accept`; disables native form validation. Also handles fields added after page load. |
 | Special inputs → text | Makes number, date, and similar inputs easier to edit. |
 | Allow copy / paste | Relaxes common page-level copy and paste restrictions. |
 

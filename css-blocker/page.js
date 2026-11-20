@@ -12,7 +12,6 @@
   let originals = new Map();
   let copyHandler;
   const hidden = new Set(), dynamic = new Set();
-  let textMarkers = [];
   const zenToken = 'ctf-' + Math.random().toString(36).slice(2);
   const protectedUI = element => !!globalThis.CTFDOM?.isExtensionUI(element);
   const attributeFilter = ['type', 'disabled', 'readonly', 'required', 'pattern', 'min', 'max', 'minlength', 'maxlength', 'step', 'accept', 'hidden', 'inert', 'open', 'style', 'class', 'oncopy', 'oncut', 'onpaste', 'oncontextmenu', 'onselectstart', ...(globalThis.CTFDOM?.markerAttributes || [])];
@@ -83,8 +82,6 @@
   function clearZen() {
     for (const element of hidden) if (element.getAttribute('data-ctf-zen') === zenToken) element.removeAttribute('data-ctf-zen');
     hidden.clear();
-    for (const [marker, text] of textMarkers) if (marker.parentNode) marker.replaceWith(text);
-    textMarkers = [];
   }
   function paintZen() {
     clearZen();
@@ -112,14 +109,8 @@
       if (element === host || protectedUI(element) || element.matches('script,style,link') || keep.has(element)) continue;
       element.setAttribute('data-ctf-zen', zenToken); hidden.add(element);
     }
-    // Static text directly in a kept ancestor cannot be hidden with an element selector.
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    const remove = [];
-    let text;
-    while ((text = walker.nextNode())) if (text.textContent.trim() && keep.has(text.parentElement) && !content.has(text.parentElement) && !text.parentElement.closest('script,style,ctf-toolbar')) remove.push(text);
-    for (const text of remove) {
-      const marker = document.createComment('CTF Zen'); text.replaceWith(marker); textMarkers.push([marker, text]);
-    }
+    // Keep app-owned text nodes in place: replacing them breaks renderer DOM references.
+    // Bare text sharing an ancestor with a form may remain visible in Zen mode.
   }
   function overlay() {
     if (!prefs.urlBar && !zen) { host?.remove(); host = undefined; shadow = undefined; return; }

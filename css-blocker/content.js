@@ -38,6 +38,8 @@
   }
 
   function ensureSafetyStyle(root) {
+    // A detached toolbar's style is never isConnected; reinserting it loops forever.
+    if (root.host && !root.host.isConnected) return;
     if (safetyStyles.get(root)?.isConnected) return;
     const parent = root === document ? document.head || document.documentElement : root;
     if (!parent) return; // document_start can run before <html> exists.
